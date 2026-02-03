@@ -1,214 +1,137 @@
-# Contributing with Claude AI Assistant
+# CLAUDE.md
 
-This guide helps contributors use Claude (AI assistant) effectively when working on OWASP Juice Shop while maintaining code quality and adhering to project standards.
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-> This document is supposed to be the primary source of context for **all** AI tools. Context files of tools other than Claude should refer to [this `CLAUDE.md` file](CLAUDE.md) for detailed guidelines. This is already the case for:
-> * GitHub CoPilot ([`.github/copilot-instructions.md`](../.github/copilot-instructions.md))
-> * Codeium ([`.codeium/instructions.md`](../.codeium/instructions.md))
-> * Continue.dev ([`.continue/instructions.md`](../.continue/instructions.md))
+> This document is the primary source of context for **all** AI tools. Context files of tools other than Claude should refer to [this `CLAUDE.md` file](CLAUDE.md) for detailed guidelines.
 
-## Before You Start
+## Quick Reference
 
-Claude can assist with various development tasks, but all contributions must still meet the requirements in [CONTRIBUTING.md](../CONTRIBUTING.md). The AI is a tool to enhance productivity, not a replacement for understanding the codebase and contribution guidelines.
-
-## Recommended Use Cases
-
-### ✅ Good Use Cases
-
-- **Code Analysis**: Understanding existing code structure and patterns
-- **Refactoring**: Improving code quality while maintaining functionality
-- **Test Writing**: Creating unit, integration, and e2e tests
-- **Bug Fixing**: Identifying and resolving issues
-- **Documentation**: Writing clear comments and documentation
-
-### ⚠️ Use with Caution
-
-- **Challenge Development**: Consult with maintainers before creating new challenges - AI-generated challenges risk being duplicate, unsolvable, or dysfunctional
-- **Security Vulnerabilities**: Ensure AI-suggested vulnerabilities are intentional and appropriate for the project
-- **Dependencies**: Verify any suggested package updates for compatibility
-- **Architecture Changes**: Discuss major structural changes with maintainers first
-
-## Essential Guidelines
-
-### 1. Clean Up AI-Generated Noise
-
-**Required** per CONTRIBUTING.md rule #6: Remove unnecessary AI-generated content before submitting PRs.
-
-Remove:
-- Verbose comments explaining obvious code
-- Generic placeholder comments
-- Overly detailed docstrings for simple functions
-- Repetitive explanations
-
-Keep:
-- Meaningful comments for complex logic
-- Challenge hints and metadata
-- Security-relevant documentation
-
-### 2. Code Style Compliance
-
-Always run ESLint before committing:
-```bash
-npm run lint
-```
-
-Claude should suggest code following [JS Standard Style](http://standardjs.com/), but always verify.
-
-### 3. Testing Requirements
-
-For any code changes Claude helps with:
-- **Unit/Integration Tests**: New features and changes should have tests
-- **E2E Tests**: Required for new/modified challenges
-- **RSN (Refactoring Safety Net)**: Required when modifying existing code that is part of a coding challenge
-- **Run Tests Locally**:
-  ```bash
-  npm test                    # Unit tests
-  npm run frisby              # API integration tests
-  npm start & npm run cypress:open  # E2E tests
-  npm run rsn                 # Refactoring Safety Net (for code changes impacting coding challenge snippets)
-  ```
-
-### 4. Commit Sign-off
-
-All commits must be signed off (DCO):
-```bash
-git commit -s -m "Your commit message"
-```
-
-### 5. Branch and PR Strategy
-
-- Work on `develop` branch-based feature branches
-- Keep PRs focused on a single scope
-- Reference related issues in PR descriptions
-
-## Development Workflow with Claude
-
-### 1. Understanding the Codebase
-```
-Ask Claude to:
-- Explain specific components or patterns
-- Identify where to implement new features
-- Trace code execution paths
-```
-
-### 2. Implementation
-```
-Ask Claude to:
-- Generate initial implementation
-- Suggest test cases
-- Review for security implications
-```
-
-### 3. Quality Assurance
-```
-Before committing:
-1. Remove AI-generated noise
-2. Run npm run lint
-3. Run relevant test suites
-4. If you modified code that is part of a coding challenge, run npm run rsn
-5. Manually verify functionality
-6. Check for unintended changes
-```
-
-### 4. Documentation
-```
-Ask Claude to:
-- Write clear commit messages
-- Draft PR descriptions
-- Document complex logic
-```
-
-## Anti-Patterns to Avoid
-
-❌ **Don't**: Accept AI suggestions blindly without understanding them
-✅ **Do**: Review and understand all AI-generated code
-
-❌ **Don't**: Submit PRs with verbose AI-generated comments
-✅ **Do**: Clean up and keep only meaningful comments
-
-❌ **Don't**: Skip testing because AI "seems confident"
-✅ **Do**: Always run the full test suite
-
-❌ **Don't**: Use AI for contribution farming or trivial changes
-✅ **Do**: Make meaningful contributions that add value
-
-❌ **Don't**: Let AI modify translations directly
-✅ **Do**: Use [Crowdin](https://crowdin.com/project/owasp-juice-shop) for translations
-
-## Example: Fixing a Bug
+### Common Commands
 
 ```bash
-# 1. Ask Claude to analyze the issue
-"Help me understand why the basket total calculation is incorrect"
+# Development
+npm install              # Install dependencies (runs postinstall to build frontend)
+npm start                # Run production build (requires prior npm install)
+npm run serve:dev        # Development with hot reload (backend + frontend)
 
-# 2. Locate the problematic code
-"Show me where basket totals are calculated"
+# Testing
+npm test                 # All tests (frontend + server unit tests)
+npm run frisby           # API integration tests (Jest/Frisby)
+npm run cypress:open     # E2E tests interactive mode
+npm run cypress:run      # E2E tests headless
 
-# 3. Implement the fix with Claude's help
-"Fix the calculation to properly handle discount edge cases"
+# Single test file examples
+npx mocha -r ts-node/register test/server/utilsSpec.ts     # Single server test
+npx jest test/api/loginApiSpec.ts                          # Single API test
+npx cypress run --spec test/cypress/e2e/login.spec.ts      # Single E2E test
 
-# 4. Generate tests
-"Create unit tests to cover the discount calculation edge cases"
+# Code quality
+npm run lint             # ESLint (backend + frontend)
+npm run lint:fix         # Auto-fix lint issues
+npm run rsn              # Refactoring Safety Net check
+npm run rsn:update       # Update RSN cache for intentional changes
 
-# 5. Quality checks
-npm run lint
-npm test
-npm run rsn  # If the fix affects code used in a coding challenge
-
-# 6. Clean up and commit with sign-off
-git commit -s -m "Fix basket total calculation for discount edge cases"
+# Build
+npm run build:frontend   # Build Angular frontend
+npm run build:server     # Compile TypeScript backend
 ```
 
-## Quality Checklist
+### Requirements
+- Node.js 20-24 (LTS versions)
+- All commits must be signed off: `git commit -s -m "message"`
+- PRs must be based on `develop` branch
+- Code style: [JS Standard Style](http://standardjs.com/)
 
-Before submitting a Claude-assisted PR:
+## Architecture Overview
 
-- [ ] Code follows JS Standard Style (ESLint passes)
-- [ ] AI-generated noise removed
-- [ ] Tests added/updated and passing
-- [ ] RSN check passing (if modified code relevant for a coding challenge)
-- [ ] Manual testing completed
-- [ ] Commits are signed off
-- [ ] Single, focused scope
-- [ ] All CI checks passing
-- [ ] PR based on `develop` branch
-- [ ] PR contains AI Tool Disclosure and Affirmation
+OWASP Juice Shop is an intentionally vulnerable web application for security training. It's a full-stack Node.js/Angular application with 100+ security challenges.
+
+### Project Structure
+
+```
+juice-shop/
+├── app.ts, server.ts    # Entry point and Express server setup
+├── routes/              # 64 API route handlers
+├── lib/                 # Core utilities (auth, challenge verification, etc.)
+├── models/              # 19 Sequelize models (SQLite database)
+├── data/
+│   ├── datacreator.ts   # Database seeding on startup
+│   └── static/
+│       ├── challenges.yml     # Challenge definitions
+│       ├── codefixes/         # 145+ vulnerable code snippets
+│       └── i18n/              # Translations (44 languages)
+├── frontend/            # Angular 16+ SPA
+│   └── src/app/
+│       ├── app.routing.ts     # 70+ routes
+│       └── (70+ components, 76 services)
+├── config/              # YAML configuration files
+├── test/
+│   ├── api/             # Jest/Frisby API tests
+│   ├── server/          # Mocha unit tests
+│   └── cypress/         # E2E browser tests
+└── rsn/                 # Refactoring Safety Net
+```
+
+### Key Files
+
+| Purpose | Location |
+|---------|----------|
+| Add API endpoint | `routes/*.ts` → register in `server.ts` |
+| Add UI page | `frontend/src/app/` → add route in `app.routing.ts` |
+| Add challenge | `data/static/challenges.yml` → verification in `routes/verify.ts` |
+| Database models | `models/*.ts` |
+| Auth/security utils | `lib/insecurity.ts` |
+| Challenge helpers | `lib/challengeUtils.ts` |
+
+### Tech Stack
+- **Backend**: Node.js, Express.js, TypeScript
+- **Frontend**: Angular 16+, Angular Material
+- **Database**: SQLite via Sequelize ORM
+- **Testing**: Jest, Mocha, Cypress, Frisby
+- **Security**: Helmet, JWT (intentionally vulnerable implementations)
 
 ## Refactoring Safety Net (RSN)
 
-When modifying existing code that is part of a coding challenge, you must run the RSN to ensure code snippet and fix option files remain consistent:
+When modifying code that is part of a coding challenge, run RSN to ensure code snippets stay synchronized:
 
 ```bash
-npm run rsn
+npm run rsn              # Check for inconsistencies
+npm run rsn:update       # Update cache for intentional changes
 ```
 
-**What it does:**
-- Checks for unexpected changes in coding challenge files
-- Detects accidental differences in lines of code
-- Lists any inconsistencies found
+The RSN compares files in `data/static/codefixes/` with their source code. Run it after:
+- Refactoring challenge-related code
+- Modifying source files referenced in challenges
 
-**When to run:**
-- After refactoring code that is part of any coding challenge
-- After changing original source files referenced in challenges
-- Before committing changes that touch challenge-related code
+## Contribution Guidelines
 
-**If RSN fails:**
-- Review the listed differences
-- If changes are intentionally part of the coding challenge, update the differences cache:
-  ```bash
-  npm run rsn:update
-  ```
-- If changes are unintentional, fix the affected files
+### Code Requirements
+1. PRs must be based on `develop` branch
+2. Code must pass ESLint (JS Standard Style)
+3. New/changed challenges require E2E tests
+4. All commits must be signed off (DCO)
+5. Remove AI-generated noise (verbose comments, redundant docstrings)
+6. Single, focused scope per PR
 
-Learn more: [Code Snippets Documentation](https://pwning.owasp-juice.shop/companion-guide/latest/part5/code-snippets.html)
+### Testing Requirements
+- **Unit/integration tests**: Required for new features
+- **E2E tests**: Required for challenge modifications
+- **RSN check**: Required when modifying coding challenge code
 
-## Getting Help
+### What to Avoid
+- Modifying translations directly (use [Crowdin](https://crowdin.com/project/owasp-juice-shop))
+- Creating new challenges without maintainer consultation
+- Adding security vulnerabilities that aren't intentional for the project
+- Low-effort or trivial PRs
 
-- Review the [detailed contribution guidelines](https://pwning.owasp-juice.shop/companion-guide/latest/part3/contribution.html)
-- Check existing issues and PRs for examples
-- Join the community on Slack or Gitter
-- Ask questions via Slack or comment on the GitHub issue you are working on
+## Challenge System
 
-## Remember
+Challenges are defined in `data/static/challenges.yml` with:
+- Metadata (name, category, difficulty 1-6)
+- OWASP vulnerability mappings
+- Hints and mitigation URLs
+- Environment restrictions
 
-Claude is a powerful tool for productivity, but you are responsible for the quality and correctness of your contributions. Always review, test, and understand the code before submitting.
+Verification hooks in `routes/verify.ts` detect when challenges are solved by intercepting requests/responses.
+
+Coding challenges include vulnerable code in `data/static/codefixes/` that users can fix. The RSN ensures these stay synchronized with source code.
