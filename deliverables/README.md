@@ -1,7 +1,7 @@
 # Deliverables - Primera Entrega
 
 **Fecha:** 2 de Febrero, 2026
-**Equipo:** [Nombre del equipo]
+**Equipo:** Alessandro Alecio - Diego Sican
 **Proyecto Seleccionado:** OWASP Juice Shop (Node.js/Angular)
 
 ---
@@ -78,7 +78,6 @@ Backlog recuperado mediante ingeniería inversa del código:
 ### 3. Onboarding Log
 **Archivo:** [ONBOARDING_LOG.md](ONBOARDING_LOG.md)
 
-Auditoría de Developer Experience con:
 - **10 friction points** identificados (3 alto, 4 medio, 3 bajo impacto)
 - Métricas del proyecto (50k+ LOC, 88 deps producción, 126 challenges)
 - Tiempos de setup estimados por método
