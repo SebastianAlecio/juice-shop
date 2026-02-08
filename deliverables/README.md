@@ -79,7 +79,7 @@ Backlog recuperado mediante ingeniería inversa del código:
 **Archivo:** [ONBOARDING_LOG.md](ONBOARDING_LOG.md)
 
 - **10 friction points** identificados (3 alto, 4 medio, 3 bajo impacto)
-- Métricas del proyecto (50k+ LOC, 88 deps producción, 126 challenges)
+- Métricas del proyecto (50,000+ líneas de código, 88 dependencias de producción, 126 challenges de seguridad)
 - Tiempos de setup estimados por método
 - Recomendaciones de mejora priorizadas
 
