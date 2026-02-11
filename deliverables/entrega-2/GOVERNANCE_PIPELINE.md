@@ -227,9 +227,25 @@ ERROR: Coverage for branches (17.55%) does not meet global threshold (50%)
 
 Estos umbrales "baseline - margen" aseguran que el pipeline detecta degradacion de coverage sin fallar por el estado actual del codigo legacy.
 
-### Tercera Ejecucion (Run #3)
+### Tercera Ejecucion (Run #3 — PASS)
 
-Pendiente — con umbrales calibrados.
+**URL:** [Run #21926521635](https://github.com/SebastianAlecio/juice-shop/actions/runs/21926521635)
+**Resultado:** PASS — todos los 9 jobs pasaron exitosamente
+
+| Job | Tiempo | Status |
+|-----|--------|--------|
+| DORA Metrics | 15s | PASS |
+| Stage 1 - Commit & Build | 3m 16s | PASS |
+| Stage 2 - Static Analysis | 2m 19s | PASS (2 warnings de complejidad) |
+| Stage 3 - Unit Tests | 4m 37s | PASS (coverage thresholds calibrados) |
+| Stage 4 - Integration Tests | 4m 4s | PASS |
+| Stage 5 - Security Scan | 1m 12s | PASS (auditoria capturada) |
+| Stage 6 - Deploy Staging | 4m 5s | PASS (Docker build + health check) |
+| Stage 7 - Smoke Tests | 41s | PASS |
+| Quality Summary | 2s | PASS |
+
+**Tiempo total del pipeline:** ~15 minutos
+**Artefactos generados:** complexity-report, security-audit, unit-test-coverage, api-test-coverage, dora-metrics-3
 
 ---
 
