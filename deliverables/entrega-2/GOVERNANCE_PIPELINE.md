@@ -1,0 +1,226 @@
+# Governance Pipeline — Segunda Entrega
+
+**Fecha:** 11 de Febrero, 2026
+**Equipo:** Alessandro Alecio - Diego Sican
+**Proyecto:** OWASP Juice Shop v19.1.1
+**Focus:** Quality Strategy & Metrics
+
+---
+
+## 1. Resumen Ejecutivo
+
+Se implemento un **Governance Pipeline** como workflow de GitHub Actions (`.github/workflows/governance.yml`) que mide automaticamente **complejidad ciclomatica** y **code coverage** en cada push y pull request. El pipeline consta de 8 stages secuenciales y paralelos, con quality gates definidos que bloquean el merge si las metricas se degradan.
+
+**Resultados clave:**
+- **2 funciones** con complejidad ciclomatica por encima del umbral de warning (15)
+- **0 funciones** por encima del umbral de fallo (20)
+- Coverage enforcement activado con umbrales: Lines >= 60%, Branches >= 50%, Functions >= 55%
+- Security scan documentado (vulnerabilidades intencionales del proyecto)
+
+---
+
+## 2. Diagrama del Pipeline
+
+```mermaid
+graph LR
+    A["1. Commit & Build<br/><i>Node 22, tsc</i>"] --> B["2. Analisis Estatico<br/><i>ESLint + Complexity</i>"]
+    A --> C["3. Tests Unitarios<br/><i>Mocha + Karma + NYC</i>"]
+    A --> D["4. Tests de Integracion<br/><i>Jest/Frisby + NYC</i>"]
+    A --> E["5. Security Scan<br/><i>npm audit</i>"]
+    B --> F["6. Deploy Staging<br/><i>Docker build + run</i>"]
+    C --> F
+    D --> F
+    E --> F
+    F --> G["7. Smoke / E2E<br/><i>docker-compose test</i>"]
+    G --> H["8. Deploy Prod<br/><i>(Documentado)</i>"]
+
+    style A fill:#4CAF50,color:white
+    style B fill:#2196F3,color:white
+    style C fill:#2196F3,color:white
+    style D fill:#2196F3,color:white
+    style E fill:#FF9800,color:white
+    style F fill:#9C27B0,color:white
+    style G fill:#9C27B0,color:white
+    style H fill:#607D8B,color:white
+```
+
+**Nota:** Los stages 2-5 corren en **paralelo** despues de que el Stage 1 (Build) pasa exitosamente. El Stage 6 espera a que todos pasen antes de proceder.
+
+---
+
+## 3. Stages del Pipeline
+
+### Stage 1: Commit & Build
+- **Herramienta:** Node.js 22, npm, TypeScript compiler (`tsc --noEmit`)
+- **Quality Gate:** Zero errores de compilacion
+- **Umbral:** 0 errores en backend (tsc) y frontend (ng build via postinstall)
+- **Si falla:** Block PR — el codigo debe compilar
+- **Justificacion:** La integridad de build es un requisito basico no negociable
+
+### Stage 2: Analisis Estatico
+- **Herramienta:** ESLint 8.57 con `standard-with-typescript` + regla `complexity`
+- **Quality Gate:** Lint limpio + complejidad ciclomatica dentro de limites
+- **Umbral:**
+  - ESLint: 0 errores (warnings permitidos)
+  - Complejidad: warn >= 15, fail >= 20
+- **Si falla:** Block PR si hay errores de ESLint o funciones con complejidad >= 20
+- **Justificacion:** La complejidad ciclomatica actual del codebase tiene un maximo de 19 (`validateConfig.ts`). Se usa warn en 15 para alertar y fail en 20 como limite duro
+
+### Stage 3: Tests Unitarios
+- **Herramienta:** Mocha (server) + Karma/Jasmine (frontend) + NYC/Istanbul (coverage)
+- **Quality Gate:** Todos los tests pasan + coverage sobre umbrales
+- **Umbral:** Lines >= 60%, Branches >= 50%, Functions >= 55%
+- **Si falla:** Block PR
+- **Justificacion:** Los umbrales fueron definidos analizando la coverage existente del upstream (reportada en Coveralls). 60% establece un piso significativo sin requerir backfill de tests legacy
+
+### Stage 4: Tests de Integracion
+- **Herramienta:** Jest/Frisby + NYC (coverage)
+- **Quality Gate:** Todos los API tests pasan + coverage sobre umbrales
+- **Umbral:** 100% pass rate, Lines >= 60%, Branches >= 50%
+- **Si falla:** Block PR
+- **Justificacion:** Los API tests verifican la integracion completa del backend (levantan el servidor internamente via `test/apiTestsSetup.ts`)
+
+### Stage 5: Security Scan
+- **Herramienta:** npm audit
+- **Quality Gate:** Auditoria documentada
+- **Umbral:** Informativo (no falla el pipeline)
+- **Si falla:** Warning solamente
+- **Justificacion:** Juice Shop **intencionalmente** usa dependencias vulnerables como parte de su diseño para entrenamiento en seguridad (`express-jwt 0.1.3`, `sanitize-html 1.4.2`, `jsonwebtoken 0.4.0`). Fallar en npm audit bloquearia permanentemente el CI. El reporte se captura como artefacto
+
+### Stage 6: Deploy Staging
+- **Herramienta:** Docker build + docker run
+- **Quality Gate:** Container se construye y la aplicacion arranca
+- **Umbral:** Health check en `http://localhost:3000` dentro de 60 segundos
+- **Si falla:** Block merge
+- **Justificacion:** Verifica que la imagen de produccion es funcional
+
+### Stage 7: Smoke / E2E Tests
+- **Herramienta:** `docker-compose.test.yml` (smoke test existente del upstream)
+- **Quality Gate:** Todos los smoke checks pasan
+- **Umbral:** 100% pass rate
+- **Si falla:** Block merge
+- **Justificacion:** Verifica: pagina principal carga, API responde, bundle Angular presente
+
+### Stage 8: Deploy Prod
+- **Herramienta:** N/A (documentado, no automatizado)
+- **Quality Gate:** N/A
+- **Umbral:** N/A
+- **Si falla:** N/A
+- **Justificacion:** Fuera del alcance del proyecto universitario. En produccion, se pusharia la imagen Docker a un registry y se desplegaria a la infraestructura destino
+
+---
+
+## 4. Quality Gates Summary
+
+| # | Stage | Herramienta | Quality Gate | Umbral | Si falla |
+|---|-------|-------------|-------------|--------|----------|
+| 1 | Commit & Build | Node 22, npm, tsc | Zero errores compilacion | 0 errores | Block PR |
+| 2 | Analisis Estatico | ESLint + complexity | Lint limpio + complejidad | warn >=15, fail >=20 | Block PR |
+| 3 | Tests Unitarios | Mocha + Karma + NYC | Tests pass + coverage | Lines >=60%, Branches >=50% | Block PR |
+| 4 | Tests Integracion | Jest/Frisby + NYC | Tests pass + coverage | Lines >=60%, Branches >=50% | Block PR |
+| 5 | Security Scan | npm audit | Auditoria documentada | Informativo | Warn |
+| 6 | Deploy Staging | Docker build + run | Container arranca | Health check 60s | Block merge |
+| 7 | Smoke / E2E | docker-compose test | Smoke checks pasan | 100% pass | Block merge |
+| 8 | Deploy Prod | (Documentado) | N/A | N/A | N/A |
+
+---
+
+## 5. Complejidad Ciclomatica
+
+### Configuracion
+
+Se agrego la regla `complexity` a `.eslintrc.js`:
+
+```javascript
+'complexity': ['warn', { max: 15 }]
+```
+
+### Reporte Actual
+
+| Metric | Value |
+|--------|-------|
+| Files analyzed | 116 |
+| Functions above soft limit (10) | 2 |
+| Functions above hard limit (15) | 2 |
+| Functions above fail limit (20) | 0 |
+| Maximum complexity | 19 |
+| **Gate Result** | **PASS** |
+
+### Funciones con Mayor Complejidad
+
+| # | File | Function | Line | Complexity | Status |
+|---|------|----------|------|------------|--------|
+| 1 | `lib/startup/validateConfig.ts` | async-arrow@L28 | 28 | 19 | WARN |
+| 2 | `routes/order.ts` | async-arrow@L37 | 37 | 17 | WARN |
+
+### Umbrales
+
+| Nivel | Rango | Accion |
+|-------|-------|--------|
+| OK | < 10 | Ninguna |
+| REVIEW | 10-14 | Revisar en code review |
+| WARN | 15-19 | Warning en CI, no bloquea |
+| FAIL | >= 20 | Bloquea el PR |
+
+---
+
+## 6. Metricas de Cobertura
+
+### Umbrales de Enforcement
+
+| Metrica | Umbral | Justificacion |
+|---------|--------|---------------|
+| Lines | >= 60% | Piso significativo sin requerir backfill de tests legacy |
+| Branches | >= 50% | Las branches tienen naturalmente menor coverage por paths de error |
+| Functions | >= 55% | Punto medio entre lineas y branches |
+
+### Donde se Aplican
+
+- **Server tests:** `npx nyc check-coverage --lines 60 --branches 50 --functions 55`
+- **API tests:** Mismo umbral aplicado despues de `npm run frisby`
+- **Frontend tests:** Coverage generada por Karma en `build/reports/coverage/frontend-tests/`
+
+---
+
+## 7. Decisiones de Diseno
+
+### D1: Workflow Separado del Upstream
+**Decision:** Crear `governance.yml` en lugar de modificar `ci.yml`
+**Razon:** El `ci.yml` existente pertenece al upstream de OWASP. Modificarlo crearia conflictos de merge y mezclaria concerns. Nuestro governance pipeline es una adicion, no un reemplazo.
+
+### D2: ESLint complexity vs Herramientas Externas
+**Decision:** Usar la regla `complexity` built-in de ESLint sobre plato/es6-plato
+**Razon:** Zero dependencias nuevas, se integra con el lint step existente, misma toolchain. Plato esta sin mantenimiento desde 2020. La regla de ESLint es mantenida activamente y suficiente para enforcement. El script `scripts/complexity-report.js` agrega la dimension de reporting.
+
+### D3: Umbrales de Coverage al 60%
+**Decision:** Iniciar con 60% lines, 50% branches, 55% functions
+**Razon:** Basado en analisis de la coverage existente del upstream. Iniciar agresivo (80%+) requeriria backfilling tests para codigo legacy, lo cual esta fuera del scope. 60% establece un piso significativo que el codigo nuevo debe mantener.
+
+### D4: npm audit como Warning
+**Decision:** Security scan no falla el pipeline
+**Razon:** Juice Shop intencionalmente incluye dependencias vulnerables como parte de sus challenges de seguridad. Fallar en npm audit bloquearia permanentemente el CI. La auditoria se captura como artefacto para documentacion.
+
+### D5: Docker como Deploy Staging
+**Decision:** Usar Docker build + run como simulacion de staging
+**Razon:** El repo ya tiene un `Dockerfile` multi-stage optimizado y `docker-compose.test.yml` con smoke tests. Reutilizar esta infraestructura existente es mas practico que configurar un hosting externo.
+
+---
+
+## 8. Trabajo Futuro
+
+- **SonarQube/SonarCloud:** Integracion con quality gates de coverage, bugs, code smells y duplicacion
+- **Tech Debt Audit:** Analisis de hotspots (churn x complexity) e identificacion de top 3 archivos para refactorizacion
+- **Strangler Fig Pattern:** Plan de refactorizacion priorizado por riesgo/impacto
+- **DORA Historical Tracking:** Acumulacion de metricas historicas conforme el equipo trabaja
+
+---
+
+## 9. Archivos Creados/Modificados
+
+| Archivo | Accion | Proposito |
+|---------|--------|-----------|
+| [`.github/workflows/governance.yml`](../../.github/workflows/governance.yml) | Creado | Pipeline de gobernanza con 8 stages |
+| [`.eslintrc.js`](../../.eslintrc.js) | Modificado | Regla `complexity` con umbral 15 |
+| [`scripts/complexity-report.js`](../../scripts/complexity-report.js) | Creado | Generador de reporte de complejidad ciclomatica |
+| [`scripts/dora-metrics.sh`](../../scripts/dora-metrics.sh) | Creado | Calculador de metricas DORA |
+| [`deliverables/entrega-2/DORA_DASHBOARD.md`](DORA_DASHBOARD.md) | Creado | Dashboard de metricas DORA |

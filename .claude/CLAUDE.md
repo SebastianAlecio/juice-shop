@@ -46,6 +46,10 @@ npm run build:server     # Compile TypeScript backend
 
 OWASP Juice Shop is an intentionally vulnerable web application for security training. It's a full-stack Node.js/Angular application with 100+ security challenges.
 
+### Startup Flow
+
+`app.ts` → validates dependencies → imports `server.ts` → `server.start()`. The server sets up Express middleware, registers all route handlers, initializes finale-rest auto-generated CRUD endpoints, seeds the database via `data/datacreator.ts`, and starts listening on port 3000.
+
 ### Project Structure
 
 ```
@@ -53,9 +57,11 @@ juice-shop/
 ├── app.ts, server.ts    # Entry point and Express server setup
 ├── routes/              # 64 API route handlers
 ├── lib/                 # Core utilities (auth, challenge verification, etc.)
-├── models/              # 19 Sequelize models (SQLite database)
+├── models/              # 21 Sequelize models (SQLite database)
 ├── data/
 │   ├── datacreator.ts   # Database seeding on startup
+│   ├── datacache.ts     # In-memory cache of challenges, users, products
+│   ├── mongodb.ts       # MarsDB collections (reviews, orders)
 │   └── static/
 │       ├── challenges.yml     # Challenge definitions
 │       ├── codefixes/         # 145+ vulnerable code snippets
@@ -79,16 +85,51 @@ juice-shop/
 | Add API endpoint | `routes/*.ts` → register in `server.ts` |
 | Add UI page | `frontend/src/app/` → add route in `app.routing.ts` |
 | Add challenge | `data/static/challenges.yml` → verification in `routes/verify.ts` |
-| Database models | `models/*.ts` |
+| Database models | `models/*.ts` (initialized in `models/index.ts`, relations in `models/relations.ts`) |
 | Auth/security utils | `lib/insecurity.ts` |
 | Challenge helpers | `lib/challengeUtils.ts` |
+| In-memory data cache | `data/datacache.ts` |
 
 ### Tech Stack
 - **Backend**: Node.js, Express.js, TypeScript
 - **Frontend**: Angular 16+, Angular Material
-- **Database**: SQLite via Sequelize ORM
+- **Database**: SQLite via Sequelize ORM (structured data) + MarsDB in-memory (reviews, orders)
 - **Testing**: Jest, Mocha, Cypress, Frisby
 - **Security**: Helmet, JWT (intentionally vulnerable implementations)
+
+### Auto-Generated CRUD Endpoints
+
+`finale-rest` generates REST endpoints for 14 models at `/api/{ModelName}s` and `/api/{ModelName}s/:id` (e.g., `/api/Users`, `/api/Products/:id`). These are configured in `server.ts` around line 475. Custom route handlers in `routes/` handle non-CRUD logic.
+
+### Configuration System
+
+Uses `node-config` with YAML files in `config/`. `config/default.yml` is the base config. Set `NODE_APP_INSTANCE=ctf` (or any other config name) to load alternate configs like `config/ctf.yml`, `config/bodgeit.yml`, etc. The config controls theming, challenge availability, chatbot settings, social links, and more.
+
+## Challenge System
+
+Challenges are defined in `data/static/challenges.yml` with:
+- Metadata (name, category, difficulty 1-6)
+- OWASP vulnerability mappings
+- Hints and mitigation URLs
+- Environment restrictions
+
+### Challenge Verification Pattern
+
+Verification hooks in `routes/verify.ts` use Express middleware that calls `challengeUtils.solveIf(challenges.key, criteriaFn)`. The `datacache.challenges` object holds all challenges in memory. When a challenge is solved, it's persisted to the DB and a WebSocket notification is emitted.
+
+### Vuln-Code-Snippet Comment System
+
+Source files containing intentional vulnerabilities are annotated with special comments for the coding challenge system:
+
+```typescript
+// vuln-code-snippet start challengeName      // marks block start
+// vuln-code-snippet end challengeName        // marks block end
+// vuln-code-snippet vuln-line challengeName  // marks the vulnerable line(s)
+// vuln-code-snippet neutral-line challengeName // context lines (not vulnerable)
+// vuln-code-snippet hide-line                // excluded from snippet display
+```
+
+These comments are parsed by `lib/codingChallenges.ts` to extract code snippets shown to users. **Never remove or reformat these comments** when editing annotated files. The RSN ensures these stay synchronized with `data/static/codefixes/`.
 
 ## Refactoring Safety Net (RSN)
 
@@ -123,15 +164,3 @@ The RSN compares files in `data/static/codefixes/` with their source code. Run i
 - Creating new challenges without maintainer consultation
 - Adding security vulnerabilities that aren't intentional for the project
 - Low-effort or trivial PRs
-
-## Challenge System
-
-Challenges are defined in `data/static/challenges.yml` with:
-- Metadata (name, category, difficulty 1-6)
-- OWASP vulnerability mappings
-- Hints and mitigation URLs
-- Environment restrictions
-
-Verification hooks in `routes/verify.ts` detect when challenges are solved by intercepting requests/responses.
-
-Coding challenges include vulnerable code in `data/static/codefixes/` that users can fix. The RSN ensures these stay synchronized with source code.

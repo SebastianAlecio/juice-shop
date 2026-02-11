@@ -33,6 +33,7 @@ module.exports = {
       files: ['**/*.ts'],
       parser: '@typescript-eslint/parser',
       rules: {
+        'complexity': ['warn', { max: 15 }],
         'no-void': 'off', // conflicting with recommendation from @typescript-eslint/no-floating-promises
         // FIXME warnings below this line need to be checked and fixed.
         '@typescript-eslint/explicit-function-return-type': 'off',

@@ -1,0 +1,324 @@
+name: "Governance Pipeline"
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - '*.md'
+      - 'LICENSE'
+      - 'deliverables/**'
+      - 'screenshots/**'
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - '*.md'
+      - 'LICENSE'
+      - 'deliverables/**'
+
+env:
+  NODE_DEFAULT_VERSION: 22
+  NODE_OPTIONS: "--max_old_space_size=4096"
+
+jobs:
+  # ============================================
+  # STAGE 1: Commit & Build
+  # ============================================
+  build:
+    name: "Stage 1 - Commit & Build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v4
+
+      - name: "Use Node.js ${{ env.NODE_DEFAULT_VERSION }}"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_DEFAULT_VERSION }}
+          cache: 'npm'
+
+      - name: "Install dependencies"
+        run: npm install
+
+      - name: "Verify TypeScript compilation"
+        run: npx tsc --noEmit
+
+  # ============================================
+  # STAGE 2: Static Analysis (Lint + Complexity)
+  # ============================================
+  static-analysis:
+    name: "Stage 2 - Static Analysis"
+    runs-on: ubuntu-latest
+    needs: [build]
+    timeout-minutes: 10
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v4
+
+      - name: "Use Node.js ${{ env.NODE_DEFAULT_VERSION }}"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_DEFAULT_VERSION }}
+          cache: 'npm'
+
+      - name: "Install dependencies (skip postinstall)"
+        run: |
+          npm install --ignore-scripts
+          cd frontend
+          npm install --ignore-scripts --legacy-peer-deps
+
+      - name: "Run ESLint"
+        run: npm run lint
+
+      - name: "Generate cyclomatic complexity report"
+        run: node scripts/complexity-report.js
+        if: always()
+
+      - name: "Upload complexity report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: complexity-report
+          path: build/reports/complexity-report.md
+        if: always()
+
+  # ============================================
+  # STAGE 3: Unit Tests + Coverage
+  # ============================================
+  unit-tests:
+    name: "Stage 3 - Unit Tests"
+    runs-on: ubuntu-latest
+    needs: [build]
+    timeout-minutes: 15
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v4
+
+      - name: "Use Node.js ${{ env.NODE_DEFAULT_VERSION }}"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_DEFAULT_VERSION }}
+          cache: 'npm'
+
+      - name: "Install dependencies"
+        run: npm install
+
+      - name: "Run frontend unit tests"
+        run: cd frontend && npm run test -- --watch=false --source-map=true
+
+      - name: "Run server unit tests with coverage"
+        run: npm run test:server
+
+      - name: "Enforce server coverage thresholds"
+        run: |
+          npx nyc check-coverage \
+            --report-dir=./build/reports/coverage/server-tests \
+            --lines 60 --branches 50 --functions 55
+
+      - name: "Upload coverage reports"
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: |
+            build/reports/coverage/frontend-tests/lcov.info
+            build/reports/coverage/server-tests/lcov.info
+        if: always()
+
+  # ============================================
+  # STAGE 4: Integration Tests (API)
+  # ============================================
+  integration-tests:
+    name: "Stage 4 - Integration Tests"
+    runs-on: ubuntu-latest
+    needs: [build]
+    timeout-minutes: 10
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v4
+
+      - name: "Use Node.js ${{ env.NODE_DEFAULT_VERSION }}"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_DEFAULT_VERSION }}
+          cache: 'npm'
+
+      - name: "Install dependencies"
+        run: npm install
+
+      - name: "Run API integration tests with coverage"
+        env:
+          NODE_ENV: test
+        run: npm run frisby
+
+      - name: "Enforce API coverage thresholds"
+        run: |
+          npx nyc check-coverage \
+            --report-dir=./build/reports/coverage/api-tests \
+            --lines 60 --branches 50 --functions 55
+
+      - name: "Upload API coverage report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-coverage
+          path: build/reports/coverage/api-tests/lcov.info
+        if: always()
+
+  # ============================================
+  # STAGE 5: Security Scan
+  # ============================================
+  security-scan:
+    name: "Stage 5 - Security Scan"
+    runs-on: ubuntu-latest
+    needs: [build]
+    timeout-minutes: 10
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v4
+
+      - name: "Use Node.js ${{ env.NODE_DEFAULT_VERSION }}"
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_DEFAULT_VERSION }}
+          cache: 'npm'
+
+      - name: "Install production dependencies"
+        run: npm install --ignore-scripts
+
+      # NOTE: npm audit will always report vulnerabilities because
+      # Juice Shop intentionally uses vulnerable packages for
+      # security training (express-jwt 0.1.3, sanitize-html 1.4.2,
+      # jsonwebtoken 0.4.0, etc). This step documents the audit
+      # but does NOT fail the pipeline.
+      - name: "Run npm audit (informational)"
+        run: npm audit --audit-level=critical 2>&1 || true
+
+      - name: "Save audit report"
+        run: |
+          mkdir -p build/reports
+          npm audit --json > build/reports/npm-audit.json 2>/dev/null || true
+
+      - name: "Upload audit report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-audit
+          path: build/reports/npm-audit.json
+        if: always()
+
+  # ============================================
+  # STAGE 6: Deploy Staging (Docker Build)
+  # ============================================
+  deploy-staging:
+    name: "Stage 6 - Deploy Staging"
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, static-analysis, security-scan]
+    timeout-minutes: 20
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v4
+
+      - name: "Build Docker image"
+        run: docker build -t juice-shop-staging:${{ github.sha }} .
+
+      - name: "Start container"
+        run: |
+          docker run -d --name juice-shop-staging \
+            -p 3000:3000 \
+            juice-shop-staging:${{ github.sha }}
+
+      - name: "Wait for application startup"
+        run: |
+          echo "Waiting for Juice Shop to start..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "Application is up!"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Application failed to start within 60 seconds"
+          docker logs juice-shop-staging
+          exit 1
+
+      - name: "Cleanup"
+        run: docker rm -f juice-shop-staging || true
+        if: always()
+
+  # ============================================
+  # STAGE 7: Smoke / E2E Tests
+  # ============================================
+  smoke-tests:
+    name: "Stage 7 - Smoke Tests"
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    timeout-minutes: 15
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v4
+
+      - name: "Run smoke test via Docker Compose"
+        run: docker compose -f docker-compose.test.yml up --exit-code-from sut
+
+  # ============================================
+  # STAGE 8: Deploy Prod (Documented Only)
+  # ============================================
+  # This stage is documented in deliverables/entrega-2/GOVERNANCE_PIPELINE.md
+  # but not automated for the university project scope.
+  # In production, this would push the Docker image to a registry
+  # and deploy to production infrastructure.
+
+  # ============================================
+  # QUALITY SUMMARY
+  # ============================================
+  quality-summary:
+    name: "Quality Summary"
+    runs-on: ubuntu-latest
+    needs: [build, static-analysis, unit-tests, integration-tests, security-scan, deploy-staging, smoke-tests]
+    if: always()
+    steps:
+      - name: "Generate quality gate summary"
+        run: |
+          cat <<'EOF' > quality-summary.md
+          ## Quality Gate Summary
+
+          **Commit:** `${{ github.sha }}`
+          **Trigger:** ${{ github.event_name }}
+
+          | # | Stage | Status |
+          |---|-------|--------|
+          | 1 | Commit & Build | ${{ needs.build.result }} |
+          | 2 | Static Analysis | ${{ needs.static-analysis.result }} |
+          | 3 | Unit Tests | ${{ needs.unit-tests.result }} |
+          | 4 | Integration Tests | ${{ needs.integration-tests.result }} |
+          | 5 | Security Scan | ${{ needs.security-scan.result }} |
+          | 6 | Deploy Staging | ${{ needs.deploy-staging.result }} |
+          | 7 | Smoke Tests | ${{ needs.smoke-tests.result }} |
+          EOF
+
+      - name: "Post summary to PR"
+        if: github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          path: quality-summary.md
+
+  # ============================================
+  # DORA METRICS (Manual trigger)
+  # ============================================
+  dora-metrics:
+    name: "DORA Metrics"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - name: "Check out Git repository (full history)"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Calculate DORA metrics"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/dora-metrics.sh > dora-report.md
+
+      - name: "Upload DORA report"
+        uses: actions/upload-artifact@v4
+        with:
+          name: dora-metrics-${{ github.run_number }}
+          path: dora-report.md
