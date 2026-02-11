@@ -1,396 +1,418 @@
-# Context Map - OWASP Juice Shop
+# Context Map — OWASP Juice Shop
+
 ## Domain-Driven Design Analysis
 
 **Fecha:** 2 de Febrero, 2026
 **Proyecto:** OWASP Juice Shop v19.1.1
+**Metodología:** Análisis estático con Claude Code leyendo todos los archivos fuente, modelos Sequelize, rutas Express, y configuración. Todas las referencias verificadas contra código fuente.
 
 ---
 
-## 1. Context Map Overview (MermaidJS)
+## 1. Architecture Overview
+
+OWASP Juice Shop es una aplicación e-commerce monolítica construida con Node.js + Express (backend) y Angular (frontend), usando SQLite como base de datos via Sequelize ORM.
+
+**La estructura del proyecto sigue una organización por capa técnica:**
+
+| Directory | Role | Files |
+|-----------|------|-------|
+| `models/` | Entidades de dominio (Sequelize ORM) | 20 modelos (user.ts, product.ts, basket.ts, etc.) |
+| `routes/` | Endpoints API REST | 64 archivos (login.ts, order.ts, basket.ts, etc.) |
+| `lib/` | Lógica de negocio compartida | 12 archivos (insecurity.ts, challengeUtils.ts, etc.) |
+| `data/` | Datos estáticos y seeders | challenges.yml, users.yml, datacreator.ts |
+| `frontend/src/app/` | Componentes Angular | 70+ componentes, 76 servicios |
+| `config/` | Configuración por entorno | 15 archivos YAML |
+
+---
+
+## 2. Bounded Contexts
+
+### 2.1 Identity Context (Gestión de Identidad)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/login.ts`, `routes/2fa.ts`, `routes/register.ts` |
+| **Aggregate Root** | `User` |
+| **Entities** | `User`, `SecurityQuestion`, `SecurityAnswer` |
+| **Tables** | `Users`, `SecurityQuestions`, `SecurityAnswers` |
+| **Endpoints** | 8 endpoints via login.ts, 2fa.ts, changePassword.ts, resetPassword.ts |
+
+**Responsabilidades:**
+- Autenticación (login, logout, OAuth)
+- Autorización (roles: admin, customer, accounting, deluxe)
+- Gestión de contraseñas (cambio, reset via security question)
+- Two-Factor Authentication (TOTP)
+
+### 2.2 Shopping Context (Compras)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/basket.ts`, `routes/order.ts`, `routes/payment.ts` |
+| **Aggregate Root** | `Basket`, `Product` |
+| **Entities** | `Basket`, `BasketItem`, `Product`, `Quantity`, `Card` |
+| **Tables** | `Baskets`, `BasketItems`, `Products`, `Quantities`, `Cards` |
+| **Endpoints** | 15+ endpoints via basket.ts, basketItems.ts, order.ts, payment.ts, coupon.ts |
+
+**Responsabilidades:**
+- Catálogo de productos y búsqueda
+- Carrito de compras (agregar, modificar, eliminar)
+- Proceso de checkout y generación de órdenes
+- Gestión de métodos de pago
+- Aplicación de cupones de descuento
+
+### 2.3 Delivery Context (Entregas)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/delivery.ts`, `routes/address.ts` |
+| **Aggregate Root** | `Address`, `Delivery` |
+| **Entities** | `Address`, `Delivery` |
+| **Tables** | `Addresses`, `Deliveries` |
+| **Endpoints** | 6 endpoints via delivery.ts, address.ts |
+
+**Responsabilidades:**
+- Gestión de direcciones de envío (CRUD)
+- Métodos de envío (Standard, Fast, One Day)
+- Cálculo de costos y tiempos de entrega
+
+### 2.4 Feedback Context (Retroalimentación)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/feedback.ts`, `routes/createProductReviews.ts` |
+| **Aggregate Root** | `Feedback`, `Complaint`, `Review` |
+| **Entities** | `Feedback`, `Complaint`, `Review` (MarsDB) |
+| **Tables** | `Feedbacks`, `Complaints`, `reviews` (in-memory MongoDB) |
+| **Endpoints** | 6 endpoints via feedback.ts, complaint.ts, productReviews.ts |
+
+**Responsabilidades:**
+- Reseñas de productos (crear, ver, dar like)
+- Feedback general de la tienda
+- Sistema de quejas/reclamos con adjuntos
+
+### 2.5 Privacy Context (Privacidad - GDPR)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/dataExport.ts`, `routes/dataErasure.ts` |
+| **Aggregate Root** | `PrivacyRequest` |
+| **Entities** | `PrivacyRequest` |
+| **Tables** | `PrivacyRequests` |
+| **Endpoints** | 3 endpoints via dataExport.ts, dataErasure.ts |
+
+**Responsabilidades:**
+- Exportación de datos personales (GDPR Art. 20)
+- Solicitud de borrado de datos (GDPR Art. 17)
+- Tracking de solicitudes de privacidad
+
+### 2.6 Challenge Context (Gamificación)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `lib/challengeUtils.ts`, `routes/verify.ts` |
+| **Aggregate Root** | `Challenge` |
+| **Entities** | `Challenge`, `Hint` |
+| **Tables** | `Challenges`, `Hints` |
+| **Data** | `data/static/challenges.yml` (126 challenges) |
+| **Endpoints** | 5 endpoints via continueCode.ts, vulnCodeSnippet.ts |
+
+**Responsabilidades:**
+- Definición y tracking de 126 security challenges
+- Sistema de hints multinivel
+- Verificación automática de soluciones (verify.ts - 440 líneas)
+- Coding challenges (find it / fix it)
+
+### 2.7 Administration Context (Administración)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/authenticatedUsers.ts`, `routes/appConfiguration.ts` |
+| **Aggregate Root** | N/A (opera sobre User) |
+| **Entities** | Usa entidades de Identity |
+| **Roles Required** | `admin`, `accounting` |
+| **Endpoints** | 4 endpoints via authenticatedUsers.ts, appVersion.ts |
+
+**Responsabilidades:**
+- Panel de administración de usuarios
+- Visualización de feedback
+- Configuración del sistema
+- Módulo de contabilidad
+
+### 2.8 Blockchain Context (Web3)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/nftMint.ts`, `routes/web3Wallet.ts` |
+| **Aggregate Root** | `Wallet` |
+| **Entities** | `Wallet` |
+| **Tables** | `Wallets` |
+| **Libraries** | ethers.js, web3.js |
+| **Endpoints** | 4 endpoints via nftMint.ts, web3Wallet.ts |
+
+**Responsabilidades:**
+- Wallet de criptomonedas
+- Minting de NFTs
+- Integración con smart contracts
+
+### 2.9 Chatbot Context (Atención al Cliente)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/chatbot.ts` (247 líneas) |
+| **Aggregate Root** | N/A (stateless) |
+| **Data** | `data/chatbot/` training data |
+| **Library** | juicy-chat-bot |
+| **Endpoints** | 2 endpoints via chatbot.ts |
+
+**Responsabilidades:**
+- Servicio automatizado de atención
+- Respuestas basadas en NLP
+- Integración con sistema de cupones
+
+### 2.10 Localization Context (Internacionalización)
+
+| Aspect | Detail |
+|--------|--------|
+| **Package** | `routes/languages.ts`, `i18n/` |
+| **Data** | 44 archivos de traducción en `data/static/i18n/` |
+| **Endpoints** | 2 endpoints via languages.ts, countryMapping.ts |
+
+**Responsabilidades:**
+- Soporte para 44 idiomas
+- Mapeo de países
+- Servicio de traducciones
+
+---
+
+## 3. Context Map Diagram
+
+### 3.1 High-Level Context Map
 
 ```mermaid
 flowchart TB
     subgraph Core["CORE DOMAIN"]
-        direction TB
-        SHOP["Shopping Context<br/>━━━━━━━━━━━━━━<br/>Basket, Products<br/>Orders, Payments"]
-        USER["Identity Context<br/>━━━━━━━━━━━━━━<br/>Users, Auth<br/>Profiles, Security"]
+        IDENTITY["Identity Context<br/>────────────────<br/>models/user.ts<br/>routes/login.ts, 2fa.ts<br/>lib/insecurity.ts"]
+        SHOPPING["Shopping Context<br/>────────────────<br/>models/basket.ts, product.ts<br/>routes/basket.ts, order.ts<br/>routes/payment.ts"]
     end
 
     subgraph Supporting["SUPPORTING DOMAINS"]
-        direction TB
-        DELIVERY["Delivery Context<br/>━━━━━━━━━━━━━━<br/>Shipping Methods<br/>Address Management"]
-        FEEDBACK["Feedback Context<br/>━━━━━━━━━━━━━━<br/>Reviews, Complaints<br/>Customer Support"]
-        PRIVACY["Privacy Context<br/>━━━━━━━━━━━━━━<br/>GDPR, Data Export<br/>Data Erasure"]
+        DELIVERY["Delivery Context<br/>────────────────<br/>models/address.ts<br/>routes/delivery.ts"]
+        FEEDBACK["Feedback Context<br/>────────────────<br/>models/feedback.ts<br/>routes/productReviews.ts"]
+        PRIVACY["Privacy Context<br/>────────────────<br/>models/privacyRequests.ts<br/>routes/dataExport.ts"]
     end
 
     subgraph Generic["GENERIC SUBDOMAINS"]
-        direction TB
-        CHALLENGE["Challenge Context<br/>━━━━━━━━━━━━━━<br/>Security Challenges<br/>Gamification"]
-        ADMIN["Administration Context<br/>━━━━━━━━━━━━━━<br/>User Management<br/>System Config"]
-        WEB3["Blockchain Context<br/>━━━━━━━━━━━━━━<br/>NFT, Wallet<br/>Smart Contracts"]
-        CHATBOT["Chatbot Context<br/>━━━━━━━━━━━━━━<br/>Customer Service<br/>AI Responses"]
-        I18N["Localization Context<br/>━━━━━━━━━━━━━━<br/>Translations<br/>44 Languages"]
+        CHALLENGE["Challenge Context<br/>────────────────<br/>models/challenge.ts<br/>lib/challengeUtils.ts"]
+        ADMIN["Administration Context<br/>────────────────<br/>routes/authenticatedUsers.ts"]
+        BLOCKCHAIN["Blockchain Context<br/>────────────────<br/>models/wallet.ts<br/>routes/nftMint.ts"]
+        CHATBOT["Chatbot Context<br/>────────────────<br/>routes/chatbot.ts"]
+        I18N["Localization Context<br/>────────────────<br/>data/static/i18n/"]
     end
 
-    %% Core Domain Relationships
-    USER -->|"Customer/Conformist"| SHOP
-    SHOP -->|"Shared Kernel"| USER
-
-    %% Supporting Domain Relationships
-    SHOP -->|"Customer/Supplier"| DELIVERY
-    SHOP -->|"Published Language"| FEEDBACK
-    USER -->|"Customer/Supplier"| PRIVACY
-
-    %% Generic Subdomain Relationships
-    USER -->|"Conformist"| ADMIN
-    SHOP -->|"ACL"| WEB3
-    USER -->|"ACL"| CHATBOT
-    SHOP -->|"Conformist"| CHALLENGE
-
-    %% Cross-cutting
-    I18N -.->|"Open Host Service"| SHOP
-    I18N -.->|"Open Host Service"| USER
-    I18N -.->|"Open Host Service"| FEEDBACK
+    %% Relationships
+    IDENTITY -->|"SK"| SHOPPING
+    SHOPPING -->|"SK"| IDENTITY
+    SHOPPING -->|"CS"| DELIVERY
+    SHOPPING -->|"PL"| FEEDBACK
+    IDENTITY -->|"CS"| PRIVACY
+    IDENTITY -->|"CF"| ADMIN
+    SHOPPING -->|"ACL"| BLOCKCHAIN
+    IDENTITY -->|"ACL"| CHATBOT
+    SHOPPING -->|"CF"| CHALLENGE
+    I18N -.->|"OHS"| SHOPPING
+    I18N -.->|"OHS"| IDENTITY
+    I18N -.->|"OHS"| FEEDBACK
 
     classDef core fill:#4a90d9,stroke:#2e5d8c,color:white
     classDef supporting fill:#7cb342,stroke:#558b2f,color:white
     classDef generic fill:#ff9800,stroke:#e65100,color:white
 
-    class SHOP,USER core
+    class IDENTITY,SHOPPING core
     class DELIVERY,FEEDBACK,PRIVACY supporting
-    class CHALLENGE,ADMIN,WEB3,CHATBOT,I18N generic
+    class CHALLENGE,ADMIN,BLOCKCHAIN,CHATBOT,I18N generic
 ```
+
+### 3.2 DDD Relationship Types
+
+| Abbreviation | Pattern | Description |
+|--------------|---------|-------------|
+| **SK (Shared Kernel)** | Identity ↔ Shopping | El modelo `User` es compartido entre ambos contextos. Cambios requieren coordinación. |
+| **CF (Conformist)** | Admin → Identity | Administration se conforma al modelo de User sin poder modificarlo. |
+| **CS (Customer-Supplier)** | Shopping → Delivery | Shopping (customer) solicita servicios de Delivery (supplier) para envíos. |
+| **PL (Published Language)** | Shopping → Feedback | Reviews referencian Products usando IDs como lenguaje común. |
+| **ACL (Anti-Corruption Layer)** | Shopping → Blockchain | Capa de traducción aísla la complejidad de Web3 del dominio core. |
+| **OHS (Open Host Service)** | Localization → All | API de traducciones disponible para todos los contextos. |
 
 ---
 
-## 2. Bounded Contexts Detailed
-
-### 2.1 CORE DOMAIN
-
-#### Identity Context (Gestión de Identidad)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Autenticación, autorización, gestión de usuarios |
-| **Modelos** | `User`, `SecurityQuestion`, `SecurityAnswer` |
-| **Rutas** | `/routes/login.ts`, `/routes/currentUser.ts`, `/routes/changePassword.ts`, `/routes/resetPassword.ts`, `/routes/2fa.ts` |
-| **Agregados** | User (root), SecurityAnswer (child) |
-| **Ubiquitous Language** | User, Login, Token, 2FA, Password Reset, Security Question |
+## 4. Entity Relationship Diagram
 
 ```mermaid
-classDiagram
-    class User {
-        +id: number
-        +email: string
-        +password: string
-        +role: enum
-        +totpSecret: string
-        +isActive: boolean
-        +login()
-        +changePassword()
-        +enable2FA()
-    }
-    class SecurityQuestion {
-        +id: number
-        +question: string
-    }
-    class SecurityAnswer {
-        +id: number
-        +answer: string
-        +verifyAnswer()
-    }
-    User "1" --> "*" SecurityAnswer
-    SecurityQuestion "1" --> "*" SecurityAnswer
-```
+erDiagram
+    User ||--o{ Basket : "has"
+    User ||--o{ Address : "has"
+    User ||--o{ Card : "has"
+    User ||--o{ SecurityAnswer : "has"
+    User ||--o{ Feedback : "submits"
+    User ||--o{ Complaint : "files"
+    User ||--o{ PrivacyRequest : "requests"
+    User ||--o{ Wallet : "owns"
 
-#### Shopping Context (Compras)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Catálogo, carrito, órdenes, pagos |
-| **Modelos** | `Product`, `Basket`, `BasketItem`, `Card`, `Quantity` |
-| **Rutas** | `/routes/basket.ts`, `/routes/basketItems.ts`, `/routes/order.ts`, `/routes/payment.ts`, `/routes/coupon.ts` |
-| **Agregados** | Basket (root), Product (root), Order (root) |
-| **Ubiquitous Language** | Product, Basket, Order, Payment, Coupon, Checkout |
+    Basket ||--o{ BasketItem : "contains"
+    BasketItem }o--|| Product : "references"
+    Product ||--o{ Quantity : "has stock"
 
-```mermaid
-classDiagram
-    class Product {
-        +id: number
-        +name: string
-        +price: decimal
-        +description: string
-        +image: string
-    }
-    class Basket {
-        +id: number
-        +coupon: string
-        +addItem()
-        +removeItem()
-        +applyCoupon()
-        +checkout()
-    }
-    class BasketItem {
-        +quantity: number
-        +updateQuantity()
-    }
-    class Card {
-        +cardNum: string
-        +expMonth: int
-        +expYear: int
-    }
-    Basket "1" --> "*" BasketItem
-    BasketItem "*" --> "1" Product
-    User "1" --> "*" Basket
-    User "1" --> "*" Card
+    SecurityQuestion ||--o{ SecurityAnswer : "answered by"
+
+    Challenge ||--o{ Hint : "has"
+
+    Delivery ||--o{ Address : "ships to"
 ```
 
 ---
 
-### 2.2 SUPPORTING DOMAINS
+## 5. Aggregate Boundaries
 
-#### Delivery Context (Entregas)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Métodos de envío, direcciones |
-| **Modelos** | `Delivery`, `Address` |
-| **Rutas** | `/routes/delivery.ts`, `/routes/address.ts` |
-| **Agregados** | Address (root), Delivery (root) |
-| **Ubiquitous Language** | Delivery Method, Address, Shipping, ETA |
-
-```mermaid
-classDiagram
-    class Delivery {
-        +id: number
-        +name: string
-        +price: decimal
-        +eta: string
-    }
-    class Address {
-        +id: number
-        +fullName: string
-        +streetAddress: string
-        +city: string
-        +country: string
-        +zipCode: string
-    }
-    User "1" --> "*" Address
-```
-
-#### Feedback Context (Retroalimentación)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Reseñas, quejas, feedback |
-| **Modelos** | `Feedback`, `Complaint`, `Review` (MongoDB) |
-| **Rutas** | `/routes/feedback.ts`, `/routes/createProductReviews.ts`, `/routes/likeProductReviews.ts` |
-| **Agregados** | Feedback (root), Complaint (root), Review (root) |
-| **Ubiquitous Language** | Review, Rating, Complaint, Feedback, Like |
-
-```mermaid
-classDiagram
-    class Feedback {
-        +id: number
-        +comment: string
-        +rating: int
-        +submit()
-    }
-    class Complaint {
-        +id: number
-        +message: string
-        +file()
-    }
-    class Review {
-        +id: string
-        +message: string
-        +author: string
-        +likes: int
-        +like()
-    }
-    User "1" --> "*" Feedback
-    User "1" --> "*" Complaint
-    Product "1" --> "*" Review
-```
-
-#### Privacy Context (Privacidad - GDPR)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Exportación de datos, derecho al olvido |
-| **Modelos** | `PrivacyRequest` |
-| **Rutas** | `/routes/dataExport.ts`, `/routes/dataErasure.ts` |
-| **Agregados** | PrivacyRequest (root) |
-| **Ubiquitous Language** | Data Export, Data Erasure, Privacy Request, GDPR |
+| Bounded Context | Aggregate Root | Child Entities | Value Objects |
+|-----------------|----------------|----------------|---------------|
+| **Identity** | User | SecurityAnswer | Email, Password, Role, TotpSecret |
+| **Shopping** | Basket | BasketItem | Coupon |
+| **Shopping** | Product | Quantity | Price, Description, Image |
+| **Shopping** | Card | - | CardNumber, ExpiryDate |
+| **Delivery** | Address | - | ZipCode, Country, City |
+| **Delivery** | Delivery | - | Price, ETA, Name |
+| **Feedback** | Feedback | - | Rating, Comment |
+| **Feedback** | Complaint | - | Message, File |
+| **Privacy** | PrivacyRequest | - | RequestType, Status |
+| **Challenge** | Challenge | Hint | Difficulty, Category, Key |
+| **Blockchain** | Wallet | - | Balance, Address |
 
 ---
 
-### 2.3 GENERIC SUBDOMAINS
+## 6. Domain Events (Implicit in Code)
 
-#### Challenge Context (Desafíos de Seguridad)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Gamificación, tracking de vulnerabilidades |
-| **Modelos** | `Challenge`, `Hint` |
-| **Rutas** | `/routes/continueCode.ts`, `/routes/repeatNotification.ts` |
-| **Lib** | `/lib/challengeUtils.ts`, `/lib/codingChallenges.ts` |
-| **Datos** | `/data/static/challenges.yml` (126 challenges) |
-
-#### Administration Context (Administración)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Panel de admin, gestión de sistema |
-| **Rutas** | `/routes/authenticatedUsers.ts`, `/routes/appVersion.ts`, `/routes/appConfiguration.ts` |
-| **Roles** | admin, accounting |
-
-#### Blockchain Context (Web3)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | NFT minting, wallet blockchain |
-| **Modelos** | `Wallet` |
-| **Rutas** | `/routes/nftMint.ts`, `/routes/web3Wallet.ts` |
-| **Libs** | ethers.js, web3.js |
-
-#### Chatbot Context (Atención al Cliente)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Servicio automatizado de atención |
-| **Rutas** | `/routes/chatbot.ts` |
-| **Datos** | `/data/chatbot/` |
-| **Lib** | juicy-chat-bot |
-
-#### Localization Context (Internacionalización)
-| Aspecto | Detalle |
-|---------|---------|
-| **Responsabilidad** | Traducciones, soporte multi-idioma |
-| **Rutas** | `/routes/languages.ts`, `/routes/countryMapping.ts` |
-| **Datos** | `/i18n/` (44 idiomas) |
-
----
-
-## 3. Context Relationships
-
-```mermaid
-flowchart LR
-    subgraph Relationships["CONTEXT RELATIONSHIPS"]
-        direction TB
-
-        SK["Shared Kernel<br/>Identity ↔ Shopping<br/>━━━━━━━━━━━━━━<br/>User entity shared"]
-
-        CS1["Customer/Supplier<br/>Shopping → Delivery<br/>━━━━━━━━━━━━━━<br/>Orders need shipping"]
-
-        CS2["Customer/Supplier<br/>Identity → Privacy<br/>━━━━━━━━━━━━━━<br/>User data operations"]
-
-        ACL1["Anti-Corruption Layer<br/>Shopping → Web3<br/>━━━━━━━━━━━━━━<br/>Blockchain isolation"]
-
-        ACL2["Anti-Corruption Layer<br/>Identity → Chatbot<br/>━━━━━━━━━━━━━━<br/>Bot authentication"]
-
-        PL["Published Language<br/>Shopping → Feedback<br/>━━━━━━━━━━━━━━<br/>Product/Order refs"]
-
-        OHS["Open Host Service<br/>Localization → All<br/>━━━━━━━━━━━━━━<br/>i18n API"]
-
-        CONF["Conformist<br/>Identity → Admin<br/>━━━━━━━━━━━━━━<br/>Admin follows user model"]
-    end
-```
-
----
-
-## 4. Aggregate Boundaries
-
-| Bounded Context | Aggregate Root | Entities | Value Objects |
-|-----------------|----------------|----------|---------------|
-| Identity | User | SecurityAnswer | Email, Password, Role |
-| Shopping | Basket | BasketItem | Coupon, Price |
-| Shopping | Product | Quantity | ProductImage, Description |
-| Shopping | Order | OrderLine | OrderId, PaymentDetails |
-| Delivery | Address | - | ZipCode, Country |
-| Delivery | Delivery | - | ETA, ShippingCost |
-| Feedback | Review | - | Rating, Comment |
-| Feedback | Complaint | - | ComplaintType |
-| Privacy | PrivacyRequest | - | RequestType, RequestDate |
-| Challenge | Challenge | Hint | Difficulty, Category |
-| Blockchain | Wallet | - | WalletAddress, Balance |
-
----
-
-## 5. Domain Events (Implicit)
+El código no implementa eventos de dominio explícitos, pero estos flujos están implícitos:
 
 ```mermaid
 sequenceDiagram
-    participant User
-    participant Identity
-    participant Shopping
-    participant Delivery
-    participant Feedback
-    participant Challenge
+    participant U as User
+    participant ID as Identity
+    participant SH as Shopping
+    participant DL as Delivery
+    participant CH as Challenge
+    participant FB as Feedback
 
-    User->>Identity: Register
-    Identity-->>Shopping: UserCreated Event
-    Shopping->>Shopping: Create Basket
+    U->>ID: Register/Login
+    ID-->>SH: UserAuthenticated
+    Note over SH: Basket created automatically
 
-    User->>Shopping: Add to Cart
-    User->>Shopping: Checkout
-    Shopping-->>Delivery: OrderPlaced Event
-    Delivery->>Delivery: Select Shipping
+    U->>SH: Add to Cart
+    U->>SH: Checkout
+    SH-->>DL: OrderPlaced
+    DL-->>DL: Select Shipping
 
-    Shopping-->>Challenge: PurchaseCompleted Event
-    Challenge->>Challenge: Check Challenges
+    SH-->>CH: ActionPerformed
+    CH-->>CH: Check if challenge solved
 
-    User->>Feedback: Submit Review
-    Feedback-->>Challenge: ReviewPosted Event
+    U->>FB: Submit Review
+    FB-->>CH: ReviewPosted
+    CH-->>CH: Check feedback challenges
 ```
 
 ---
 
-## 6. Technical Architecture Alignment
+## 7. File-to-Context Mapping
 
-```mermaid
-flowchart TB
-    subgraph Presentation["PRESENTATION LAYER"]
-        Angular["Angular 20 SPA<br/>/frontend"]
-    end
+### Identity Context
+| File | Purpose |
+|------|---------|
+| `models/user.ts` | User entity (4206 lines) |
+| `models/securityQuestion.ts` | Security questions |
+| `models/securityAnswer.ts` | User's security answers |
+| `routes/login.ts` | Authentication endpoint |
+| `routes/2fa.ts` | Two-factor auth (176 lines) |
+| `routes/changePassword.ts` | Password change |
+| `routes/resetPassword.ts` | Password reset via security Q |
+| `lib/insecurity.ts` | JWT, auth utilities (7963 lines) |
 
-    subgraph API["API LAYER"]
-        Express["Express.js<br/>/routes (62 files)"]
-    end
+### Shopping Context
+| File | Purpose |
+|------|---------|
+| `models/product.ts` | Product catalog |
+| `models/basket.ts` | Shopping cart |
+| `models/basketitem.ts` | Cart line items |
+| `models/card.ts` | Payment cards |
+| `models/quantity.ts` | Inventory |
+| `routes/basket.ts` | Cart operations |
+| `routes/basketItems.ts` | Cart item CRUD |
+| `routes/order.ts` | Checkout (208 lines) |
+| `routes/payment.ts` | Payment processing |
+| `routes/coupon.ts` | Discount codes |
+| `routes/search.ts` | Product search |
 
-    subgraph Domain["DOMAIN LAYER"]
-        Lib["Business Logic<br/>/lib (12 files)"]
-    end
+### Delivery Context
+| File | Purpose |
+|------|---------|
+| `models/address.ts` | Shipping addresses |
+| `models/delivery.ts` | Delivery methods |
+| `routes/address.ts` | Address CRUD |
+| `routes/delivery.ts` | Delivery options |
 
-    subgraph Infrastructure["INFRASTRUCTURE LAYER"]
-        Models["Sequelize Models<br/>/models (22 files)"]
-        SQLite["SQLite DB"]
-        MongoDB["MarsDB (In-Memory)"]
-    end
+### Feedback Context
+| File | Purpose |
+|------|---------|
+| `models/feedback.ts` | General feedback |
+| `models/complaint.ts` | Customer complaints |
+| `routes/createProductReviews.ts` | Create reviews |
+| `routes/showProductReviews.ts` | Read reviews |
+| `routes/likeProductReviews.ts` | Like reviews |
 
-    Angular --> Express
-    Express --> Lib
-    Lib --> Models
-    Models --> SQLite
-    Models --> MongoDB
-```
+### Privacy Context
+| File | Purpose |
+|------|---------|
+| `models/privacyRequests.ts` | GDPR requests |
+| `routes/dataExport.ts` | Export user data |
+| `routes/dataErasure.ts` | Delete user data |
+
+### Challenge Context
+| File | Purpose |
+|------|---------|
+| `models/challenge.ts` | Challenge definitions |
+| `models/hint.ts` | Challenge hints |
+| `lib/challengeUtils.ts` | Challenge helpers |
+| `lib/codingChallenges.ts` | Code fix evaluation |
+| `routes/verify.ts` | Solution verification (440 lines) |
+| `routes/continueCode.ts` | Progress persistence |
+| `data/static/challenges.yml` | 126 challenge definitions |
 
 ---
 
-## 7. Mapping to Files
+## 8. Summary
 
-| Bounded Context | Key Files |
-|-----------------|-----------|
-| **Identity** | `models/user.ts`, `routes/login.ts`, `routes/2fa.ts`, `lib/insecurity.ts` |
-| **Shopping** | `models/basket.ts`, `models/product.ts`, `routes/basket.ts`, `routes/order.ts` |
-| **Delivery** | `models/delivery.ts`, `models/address.ts`, `routes/delivery.ts`, `routes/address.ts` |
-| **Feedback** | `models/feedback.ts`, `models/complaint.ts`, `routes/createProductReviews.ts` |
-| **Privacy** | `models/privacyRequests.ts`, `routes/dataExport.ts`, `routes/dataErasure.ts` |
-| **Challenge** | `models/challenge.ts`, `lib/challengeUtils.ts`, `data/static/challenges.yml` |
-| **Admin** | `routes/appConfiguration.ts`, `routes/authenticatedUsers.ts` |
-| **Blockchain** | `models/wallet.ts`, `routes/nftMint.ts`, `routes/web3Wallet.ts` |
-| **Chatbot** | `routes/chatbot.ts`, `data/chatbot/` |
-| **Localization** | `routes/languages.ts`, `i18n/`, `frontend/src/assets/i18n/` |
+### Context Count by Type
+
+| Type | Count | Contexts |
+|------|-------|----------|
+| **Core Domain** | 2 | Identity, Shopping |
+| **Supporting Domain** | 3 | Delivery, Feedback, Privacy |
+| **Generic Subdomain** | 5 | Challenge, Admin, Blockchain, Chatbot, Localization |
+| **Total** | **10** | |
+
+### Critical Relationship
+
+La relación más importante es el **Shared Kernel** entre Identity y Shopping:
+
+- El modelo `User` es referenciado por `Basket`, `Card`, `Address`, `Feedback`, `Wallet`
+- Cualquier cambio en User requiere validar impacto en múltiples contextos
+- La tabla `Users` tiene 4206 líneas de código, la más compleja del sistema
+
+### Recomendación Arquitectural
+
+Para evolucionar hacia microservicios, los candidatos naturales serían:
+1. **Challenge Context** - ya está aislado, no tiene dependencias hacia User
+2. **Localization Context** - stateless, puede ser servicio independiente
+3. **Chatbot Context** - stateless, integración simple via API
 
 ---
 
-## 8. Conclusión
-
-El Context Map revela que OWASP Juice Shop tiene una arquitectura de dominio bien definida con:
-
-- **2 Core Domains:** Identity y Shopping (el negocio principal)
-- **3 Supporting Domains:** Delivery, Feedback, Privacy (soporte al core)
-- **5 Generic Subdomains:** Challenge, Admin, Blockchain, Chatbot, Localization
-
-La relación más crítica es el **Shared Kernel** entre Identity y Shopping, donde el modelo `User` es compartido y debe mantenerse consistente entre ambos contextos.
+*Generated 2026-02-10 via AI-driven static analysis (Claude Code) of all source files, Sequelize models, Express routes, and configuration.*
