@@ -35,7 +35,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
-          cache: 'npm'
 
       - name: "Install dependencies"
         run: npm install
@@ -59,7 +58,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
-          cache: 'npm'
 
       - name: "Install dependencies (skip postinstall)"
         run: |
@@ -97,7 +95,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
-          cache: 'npm'
 
       - name: "Install dependencies"
         run: npm install
@@ -139,7 +136,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
-          cache: 'npm'
 
       - name: "Install dependencies"
         run: npm install
@@ -178,7 +174,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_DEFAULT_VERSION }}
-          cache: 'npm'
 
       - name: "Install production dependencies"
         run: npm install --ignore-scripts
