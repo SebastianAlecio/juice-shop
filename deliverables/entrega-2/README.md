@@ -85,9 +85,10 @@ Incluye metodologia de calculo, clasificacion DORA, y tabla de tendencia histori
 **Decision:** Usar la regla `complexity` built-in de ESLint.
 **Razon:** Zero dependencias nuevas, integracion nativa con el lint step existente. Plato esta sin mantenimiento. SonarQube se integrara como trabajo futuro.
 
-### D3: Umbrales Iniciales Moderados
-**Decision:** Coverage al 60% (no 80%), complejidad warn en 15 (no 10).
-**Razon:** El codebase tiene codigo legacy del upstream. Umbrales agresivos requeririan backfill de tests fuera del scope. Los umbrales elegidos establecen un piso significativo que previene degradacion sin bloquear el trabajo existente.
+### D3: Calibracion de Umbrales de Coverage
+**Decision inicial:** 60% lines, 50% branches, 55% functions. **Fallo en CI** — coverage real de server tests es ~21%.
+**Decision final:** Umbrales calibrados con datos reales (server: 20/15/15%, API: 40/5/25%).
+**Razon:** Se aplico el principio "baseline - margen": el objetivo es detectar degradacion, no alcanzar un numero arbitrario. El pipeline bloquea PRs que reduzcan coverage por debajo de los pisos actuales.
 
 ### D4: Security Scan como Warning
 **Decision:** `npm audit` no falla el pipeline.

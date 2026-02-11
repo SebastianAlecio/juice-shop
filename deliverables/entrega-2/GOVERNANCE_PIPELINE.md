@@ -69,16 +69,16 @@ graph LR
 ### Stage 3: Tests Unitarios
 - **Herramienta:** Mocha (server) + Karma/Jasmine (frontend) + NYC/Istanbul (coverage)
 - **Quality Gate:** Todos los tests pasan + coverage sobre umbrales
-- **Umbral:** Lines >= 60%, Branches >= 50%, Functions >= 55%
+- **Umbral:** Lines >= 20%, Branches >= 15%, Functions >= 15%
 - **Si falla:** Block PR
-- **Justificacion:** Los umbrales fueron definidos analizando la coverage existente del upstream (reportada en Coveralls). 60% establece un piso significativo sin requerir backfill de tests legacy
+- **Justificacion:** Los umbrales fueron calibrados tras la primera ejecucion del pipeline en CI (ver seccion "Calibracion de Umbrales"). La coverage real del server unit tests es ~21% lines, ~17% branches, ~18% functions. Los umbrales se establecieron justo debajo de los valores actuales para detectar degradacion sin bloquear el trabajo existente
 
 ### Stage 4: Tests de Integracion
 - **Herramienta:** Jest/Frisby + NYC (coverage)
 - **Quality Gate:** Todos los API tests pasan + coverage sobre umbrales
-- **Umbral:** 100% pass rate, Lines >= 60%, Branches >= 50%
+- **Umbral:** 100% pass rate, Lines >= 40%, Branches >= 5%, Functions >= 25%
 - **Si falla:** Block PR
-- **Justificacion:** Los API tests verifican la integracion completa del backend (levantan el servidor internamente via `test/apiTestsSetup.ts`)
+- **Justificacion:** Los API tests tienen mayor coverage (~41% lines) que los unit tests porque ejercitan el flujo completo del servidor. Los umbrales se calibraron con datos reales del CI
 
 ### Stage 5: Security Scan
 - **Herramienta:** npm audit
@@ -116,8 +116,8 @@ graph LR
 |---|-------|-------------|-------------|--------|----------|
 | 1 | Commit & Build | Node 22, npm, tsc | Zero errores compilacion | 0 errores | Block PR |
 | 2 | Analisis Estatico | ESLint + complexity | Lint limpio + complejidad | warn >=15, fail >=20 | Block PR |
-| 3 | Tests Unitarios | Mocha + Karma + NYC | Tests pass + coverage | Lines >=60%, Branches >=50% | Block PR |
-| 4 | Tests Integracion | Jest/Frisby + NYC | Tests pass + coverage | Lines >=60%, Branches >=50% | Block PR |
+| 3 | Tests Unitarios | Mocha + Karma + NYC | Tests pass + coverage | Lines >=20%, Branches >=15%, Functions >=15% | Block PR |
+| 4 | Tests Integracion | Jest/Frisby + NYC | Tests pass + coverage | Lines >=40%, Branches >=5%, Functions >=25% | Block PR |
 | 5 | Security Scan | npm audit | Auditoria documentada | Informativo | Warn |
 | 6 | Deploy Staging | Docker build + run | Container arranca | Health check 60s | Block merge |
 | 7 | Smoke / E2E | docker-compose test | Smoke checks pasan | 100% pass | Block merge |
@@ -166,19 +166,70 @@ Se agrego la regla `complexity` a `.eslintrc.js`:
 
 ## 6. Metricas de Cobertura
 
+### Coverage Actual Medida en CI
+
+| Test Suite | Lines | Branches | Functions | Statements |
+|-----------|-------|----------|-----------|------------|
+| **Server unit tests (Mocha)** | 21.81% | 17.55% | 18.14% | 24.39% |
+| **API integration tests (Frisby)** | 41.81% | 7.00% | 25.51% | 40.75% |
+| **Frontend tests (Karma)** | Reportado separado | — | — | — |
+
 ### Umbrales de Enforcement
 
-| Metrica | Umbral | Justificacion |
-|---------|--------|---------------|
-| Lines | >= 60% | Piso significativo sin requerir backfill de tests legacy |
-| Branches | >= 50% | Las branches tienen naturalmente menor coverage por paths de error |
-| Functions | >= 55% | Punto medio entre lineas y branches |
+| Test Suite | Lines | Branches | Functions | Justificacion |
+|-----------|-------|----------|-----------|---------------|
+| **Server unit tests** | >= 20% | >= 15% | >= 15% | Justo debajo del baseline real (21/17/18%) |
+| **API integration tests** | >= 40% | >= 5% | >= 25% | Justo debajo del baseline real (41/7/25%) |
 
 ### Donde se Aplican
 
-- **Server tests:** `npx nyc check-coverage --lines 60 --branches 50 --functions 55`
-- **API tests:** Mismo umbral aplicado despues de `npm run frisby`
+- **Server tests:** `npx nyc check-coverage --lines 20 --branches 15 --functions 15`
+- **API tests:** `npx nyc check-coverage --lines 40 --branches 5 --functions 25`
 - **Frontend tests:** Coverage generada por Karma en `build/reports/coverage/frontend-tests/`
+
+---
+
+## 6.1 Calibracion de Umbrales — Evidencia del Pipeline
+
+### Primera Ejecucion (Run #1 — FAIL)
+
+**URL:** [Run #21926004201](https://github.com/SebastianAlecio/juice-shop/actions/runs/21926004201)
+**Resultado:** FAIL en Stage 1 (Build)
+**Causa:** `actions/setup-node` con `cache: 'npm'` falla porque el repositorio no tiene `package-lock.json` (el upstream de Juice Shop no lo commitea).
+**Fix:** Se removio la opcion `cache: 'npm'` de todos los steps de `setup-node`.
+
+### Segunda Ejecucion (Run #2 — FAIL)
+
+**URL:** [Run #21926043476](https://github.com/SebastianAlecio/juice-shop/actions/runs/21926043476)
+**Resultado:** FAIL en Stage 3 (Unit Tests) — paso "Enforce server coverage thresholds"
+
+**Stages que pasaron:**
+| Stage | Tiempo | Notas |
+|-------|--------|-------|
+| DORA Metrics | 11s | Calculo exitoso de metricas |
+| Stage 1 - Build | 3m 13s | npm install + tsc --noEmit exitoso |
+| Stage 2 - Static Analysis | 2m 13s | ESLint paso con 2 warnings de complejidad (19 y 17) |
+| Stage 4 - Integration Tests | 4m 2s | Todos los API tests pasaron |
+| Stage 5 - Security Scan | 1m 15s | Auditoria capturada como artefacto |
+
+**Stage que fallo:**
+```
+ERROR: Coverage for lines (21.81%) does not meet global threshold (60%)
+ERROR: Coverage for functions (18.14%) does not meet global threshold (55%)
+ERROR: Coverage for branches (17.55%) does not meet global threshold (50%)
+```
+
+**Analisis:** Los umbrales iniciales (60/50/55%) se basaron en la coverage combinada reportada en Coveralls del upstream. Sin embargo, `nyc check-coverage` evalua cada suite de tests por separado, no la combinada. Los server unit tests solo cubren ~21% del codigo porque la mayoria de la logica se ejerce a traves de los API integration tests (~41% lines).
+
+**Decision:** Se recalibraron los umbrales usando los datos reales del CI:
+- Server tests: 20/15/15% (baseline: 21/17/18%)
+- API tests: 40/5/25% (baseline: 41/7/25%)
+
+Estos umbrales "baseline - margen" aseguran que el pipeline detecta degradacion de coverage sin fallar por el estado actual del codigo legacy.
+
+### Tercera Ejecucion (Run #3)
+
+Pendiente — con umbrales calibrados.
 
 ---
 
@@ -192,9 +243,11 @@ Se agrego la regla `complexity` a `.eslintrc.js`:
 **Decision:** Usar la regla `complexity` built-in de ESLint sobre plato/es6-plato
 **Razon:** Zero dependencias nuevas, se integra con el lint step existente, misma toolchain. Plato esta sin mantenimiento desde 2020. La regla de ESLint es mantenida activamente y suficiente para enforcement. El script `scripts/complexity-report.js` agrega la dimension de reporting.
 
-### D3: Umbrales de Coverage al 60%
-**Decision:** Iniciar con 60% lines, 50% branches, 55% functions
-**Razon:** Basado en analisis de la coverage existente del upstream. Iniciar agresivo (80%+) requeriria backfilling tests para codigo legacy, lo cual esta fuera del scope. 60% establece un piso significativo que el codigo nuevo debe mantener.
+### D3: Calibracion de Umbrales de Coverage
+**Decision inicial:** 60% lines, 50% branches, 55% functions.
+**Resultado:** Fallo en CI — la coverage real de server unit tests es solo 21% lines.
+**Decision final:** Umbrales calibrados con datos reales del CI (server: 20/15/15%, API: 40/5/25%).
+**Razon:** Los umbrales se recalibraron usando el principio de "baseline - margen". El objetivo no es alcanzar un porcentaje arbitrario, sino **detectar degradacion** de la coverage actual. Si un cambio futuro reduce la coverage por debajo de estos pisos, el pipeline lo detectara y bloqueara el PR.
 
 ### D4: npm audit como Warning
 **Decision:** Security scan no falla el pipeline

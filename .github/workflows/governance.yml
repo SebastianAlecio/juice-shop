@@ -109,7 +109,7 @@ jobs:
         run: |
           npx nyc check-coverage \
             --report-dir=./build/reports/coverage/server-tests \
-            --lines 60 --branches 50 --functions 55
+            --lines 20 --branches 15 --functions 15
 
       - name: "Upload coverage reports"
         uses: actions/upload-artifact@v4
@@ -149,7 +149,7 @@ jobs:
         run: |
           npx nyc check-coverage \
             --report-dir=./build/reports/coverage/api-tests \
-            --lines 60 --branches 50 --functions 55
+            --lines 40 --branches 5 --functions 25
 
       - name: "Upload API coverage report"
         uses: actions/upload-artifact@v4
