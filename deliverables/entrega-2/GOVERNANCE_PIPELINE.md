@@ -14,8 +14,9 @@ Se implemento un **Governance Pipeline** como workflow de GitHub Actions (`.gith
 **Resultados clave:**
 - **2 funciones** con complejidad ciclomatica por encima del umbral de warning (15)
 - **0 funciones** por encima del umbral de fallo (20)
-- Coverage enforcement activado con umbrales: Lines >= 60%, Branches >= 50%, Functions >= 55%
+- Coverage enforcement activado con umbrales calibrados (Server: Lines >= 20%, API: Lines >= 40%)
 - Security scan documentado (vulnerabilidades intencionales del proyecto)
+- **SonarCloud** integrado como Stage 5b para analisis de bugs, code smells y duplicacion
 
 ---
 
@@ -27,10 +28,13 @@ graph LR
     A --> C["3. Tests Unitarios<br/><i>Mocha + Karma + NYC</i>"]
     A --> D["4. Tests de Integracion<br/><i>Jest/Frisby + NYC</i>"]
     A --> E["5. Security Scan<br/><i>npm audit</i>"]
+    C --> SC["5b. SonarCloud<br/><i>Quality Gates</i>"]
+    D --> SC
     B --> F["6. Deploy Staging<br/><i>Docker build + run</i>"]
     C --> F
     D --> F
     E --> F
+    SC --> F
     F --> G["7. Smoke / E2E<br/><i>docker-compose test</i>"]
     G --> H["8. Deploy Prod<br/><i>(Documentado)</i>"]
 
@@ -39,12 +43,13 @@ graph LR
     style C fill:#2196F3,color:white
     style D fill:#2196F3,color:white
     style E fill:#FF9800,color:white
+    style SC fill:#00BCD4,color:white
     style F fill:#9C27B0,color:white
     style G fill:#9C27B0,color:white
     style H fill:#607D8B,color:white
 ```
 
-**Nota:** Los stages 2-5 corren en **paralelo** despues de que el Stage 1 (Build) pasa exitosamente. El Stage 6 espera a que todos pasen antes de proceder.
+**Nota:** Los stages 2-5 corren en **paralelo** despues de que el Stage 1 (Build) pasa exitosamente. Stage 5b (SonarCloud) espera la coverage de Stages 3 y 4. El Stage 6 espera a que todos pasen antes de proceder.
 
 ---
 
@@ -87,6 +92,14 @@ graph LR
 - **Si falla:** Warning solamente
 - **Justificacion:** Juice Shop **intencionalmente** usa dependencias vulnerables como parte de su diseño para entrenamiento en seguridad (`express-jwt 0.1.3`, `sanitize-html 1.4.2`, `jsonwebtoken 0.4.0`). Fallar en npm audit bloquearia permanentemente el CI. El reporte se captura como artefacto
 
+### Stage 5b: SonarCloud Analysis
+- **Herramienta:** SonarCloud (sonarcloud.io) via `SonarSource/sonarcloud-action@v5`
+- **Quality Gate:** Bugs, Code Smells, Duplicaciones, Coverage en codigo nuevo
+- **Umbral:** Bugs = 0, Code Smells <= 10, Coverage >= 15%, Duplicacion <= 5% (en codigo nuevo)
+- **Si falla:** Warning (informativo en primera fase)
+- **Justificacion:** Complementa el analisis de ESLint con metricas de duplicacion, cognitive complexity, y quality gates multi-dimensionales. Se configura como warning inicialmente porque las reglas de seguridad de SonarCloud flaggearian las vulnerabilidades intencionales de Juice Shop. La coverage se alimenta de los reportes LCOV generados en Stages 3 y 4.
+- **Prerequisitos:** Configurar `SONAR_TOKEN` en GitHub Secrets y crear proyecto en sonarcloud.io
+
 ### Stage 6: Deploy Staging
 - **Herramienta:** Docker build + docker run
 - **Quality Gate:** Container se construye y la aplicacion arranca
@@ -119,6 +132,7 @@ graph LR
 | 3 | Tests Unitarios | Mocha + Karma + NYC | Tests pass + coverage | Lines >=20%, Branches >=15%, Functions >=15% | Block PR |
 | 4 | Tests Integracion | Jest/Frisby + NYC | Tests pass + coverage | Lines >=40%, Branches >=5%, Functions >=25% | Block PR |
 | 5 | Security Scan | npm audit | Auditoria documentada | Informativo | Warn |
+| 5b | SonarCloud | SonarSource/sonarcloud-action | Bugs, Smells, Duplicacion | Bugs=0, Smells<=10 (new code) | Warn |
 | 6 | Deploy Staging | Docker build + run | Container arranca | Health check 60s | Block merge |
 | 7 | Smoke / E2E | docker-compose test | Smoke checks pasan | 100% pass | Block merge |
 | 8 | Deploy Prod | (Documentado) | N/A | N/A | N/A |
@@ -277,10 +291,10 @@ Estos umbrales "baseline - margen" aseguran que el pipeline detecta degradacion 
 
 ## 8. Trabajo Futuro
 
-- **SonarQube/SonarCloud:** Integracion con quality gates de coverage, bugs, code smells y duplicacion
-- **Tech Debt Audit:** Analisis de hotspots (churn x complexity) e identificacion de top 3 archivos para refactorizacion
-- **Strangler Fig Pattern:** Plan de refactorizacion priorizado por riesgo/impacto
+- **SonarCloud Quality Gate Enforcement:** Cambiar SonarCloud de warning a blocking una vez calibrados los umbrales
+- **Ejecutar Refactorizacion:** Implementar las fases del [Plan de Refactorizacion](REFACTORING_PLAN.md) para los 3 candidatos
 - **DORA Historical Tracking:** Acumulacion de metricas historicas conforme el equipo trabaja
+- **Mutation Testing:** Agregar mutation testing para funciones criticas de seguridad en `lib/insecurity.ts`
 
 ---
 
@@ -293,3 +307,7 @@ Estos umbrales "baseline - margen" aseguran que el pipeline detecta degradacion 
 | [`scripts/complexity-report.js`](../../scripts/complexity-report.js) | Creado | Generador de reporte de complejidad ciclomatica |
 | [`scripts/dora-metrics.sh`](../../scripts/dora-metrics.sh) | Creado | Calculador de metricas DORA |
 | [`deliverables/entrega-2/DORA_DASHBOARD.md`](DORA_DASHBOARD.md) | Creado | Dashboard de metricas DORA |
+| [`sonar-project.properties`](../../sonar-project.properties) | Creado | Configuracion de SonarCloud |
+| [`scripts/hotspot-analysis.js`](../../scripts/hotspot-analysis.js) | Creado | Analisis de hotspots (churn x complejidad) |
+| [`deliverables/entrega-2/TECH_DEBT_AUDIT.md`](TECH_DEBT_AUDIT.md) | Creado | Auditoria de deuda tecnica |
+| [`deliverables/entrega-2/REFACTORING_PLAN.md`](REFACTORING_PLAN.md) | Creado | Plan de refactorizacion Strangler Fig |

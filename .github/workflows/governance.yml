@@ -159,6 +159,37 @@ jobs:
         if: always()
 
   # ============================================
+  # STAGE 5b: SonarCloud Analysis
+  # ============================================
+  sonarcloud:
+    name: "Stage 5b - SonarCloud"
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    timeout-minutes: 10
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "Download unit test coverage"
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-test-coverage
+          path: build/reports/coverage/server-tests/
+
+      - name: "Download API test coverage"
+        uses: actions/download-artifact@v4
+        with:
+          name: api-test-coverage
+          path: build/reports/coverage/api-tests/
+
+      - name: "SonarCloud Scan"
+        uses: SonarSource/sonarcloud-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+  # ============================================
   # STAGE 5: Security Scan
   # ============================================
   security-scan:
@@ -204,7 +235,7 @@ jobs:
   deploy-staging:
     name: "Stage 6 - Deploy Staging"
     runs-on: ubuntu-latest
-    needs: [unit-tests, integration-tests, static-analysis, security-scan]
+    needs: [unit-tests, integration-tests, static-analysis, security-scan, sonarcloud]
     timeout-minutes: 20
     steps:
       - name: "Check out Git repository"
@@ -266,7 +297,7 @@ jobs:
   quality-summary:
     name: "Quality Summary"
     runs-on: ubuntu-latest
-    needs: [build, static-analysis, unit-tests, integration-tests, security-scan, deploy-staging, smoke-tests]
+    needs: [build, static-analysis, unit-tests, integration-tests, security-scan, sonarcloud, deploy-staging, smoke-tests]
     if: always()
     steps:
       - name: "Generate quality gate summary"
@@ -284,6 +315,7 @@ jobs:
           | 3 | Unit Tests | ${{ needs.unit-tests.result }} |
           | 4 | Integration Tests | ${{ needs.integration-tests.result }} |
           | 5 | Security Scan | ${{ needs.security-scan.result }} |
+          | 5b | SonarCloud | ${{ needs.sonarcloud.result }} |
           | 6 | Deploy Staging | ${{ needs.deploy-staging.result }} |
           | 7 | Smoke Tests | ${{ needs.smoke-tests.result }} |
           EOF
