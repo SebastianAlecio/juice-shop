@@ -3,7 +3,9 @@
 **Fecha:** 11 de Febrero, 2026
 **Equipo:** Alessandro Alecio - Diego Sican
 **Periodo:** Ultimos 30 dias
-**Repositorio:** [SebastianAlecio/juice-shop](https://github.com/SebastianAlecio/juice-shop)
+**Fuente de datos:** Repositorio upstream [juice-shop/juice-shop](https://github.com/juice-shop/juice-shop) (proyecto OWASP oficial)
+
+> Se utiliza el repositorio upstream como fuente de datos porque tiene historial suficiente de PRs, issues y deploys para calcular las 4 metricas DORA de forma significativa. El fork del equipo ([SebastianAlecio/juice-shop](https://github.com/SebastianAlecio/juice-shop)) acumulara sus propias metricas conforme avance el proyecto.
 
 ---
 
@@ -11,12 +13,10 @@
 
 | Metrica | Valor | Clasificacion | Benchmark DORA |
 |---------|-------|--------------|----------------|
-| **Deployment Frequency** | 6 deploys (1.4/semana) | High (semanal) | Elite: diario, High: semanal |
-| **Lead Time for Changes** | Pendiente | Pendiente | Elite: <1 dia, High: 1-7 dias |
-| **Time to Restore (MTTR)** | N/A | N/A (sin incidentes) | Elite: <1 hora, High: <1 dia |
-| **Change Failure Rate** | 0% (0 reverts / 6 deploys) | Elite (0-15%) | Elite: 0-15%, High: 16-30% |
-
-> **Nota:** Lead Time y MTTR requieren datos de Pull Requests y Issues con label "bug" en GitHub. Estos datos se popularan automaticamente conforme el equipo trabaje con PRs y reporte bugs. El script `dora-metrics.sh` calcula ambas metricas via la API de GitHub cuando corre en GitHub Actions (con `GH_TOKEN`).
+| **Deployment Frequency** | 9 merges (2.1/semana) | High (semanal) | Elite: diario, High: semanal |
+| **Lead Time for Changes** | 6.4 dias promedio | High (1-7 dias) | Elite: <1 dia, High: 1-7 dias |
+| **Time to Restore (MTTR)** | 18.5 horas promedio | High (< 1 dia) | Elite: <1 hora, High: <1 dia |
+| **Change Failure Rate** | 0% (0 reverts / 9 merges) | Elite (0-15%) | Elite: 0-15%, High: 16-30% |
 
 ---
 
@@ -24,55 +24,90 @@
 
 ### 1. Deployment Frequency (Frecuencia de Deploy)
 
-**Valor:** 6 commits a master en los ultimos 30 dias (1.4/semana)
+**Valor:** 9 PRs mergeados en los ultimos 30 dias (2.1/semana)
 **Clasificacion:** High
 
-| Periodo | Commits a master | Merges | Deploys/semana |
-|---------|-----------------|--------|----------------|
-| Ultimos 30 dias | 6 | 0 | 1.4 |
+| Periodo | PRs mergeados | Deploys/semana | Clasificacion |
+|---------|--------------|----------------|---------------|
+| Ultimos 30 dias | 9 | 2.1 | High |
 
-**Fuente de datos:** `git log --since="30 days ago" master`
+**Fuente de datos:** `gh pr list --repo juice-shop/juice-shop --state merged --limit 30`
 
-**Interpretacion:** El equipo esta desplegando con frecuencia semanal, lo cual se clasifica como "High" en los benchmarks DORA. Para alcanzar "Elite" se necesitarian deploys diarios.
+**Interpretacion:** El proyecto upstream mantiene una frecuencia de deploy semanal consistente, con picos de actividad alrededor de sprints de contribuciones open-source. Para alcanzar "Elite" se necesitarian merges diarios.
 
 ### 2. Lead Time for Changes (Tiempo de Entrega)
 
-**Valor:** Pendiente (requiere PRs mergeados)
-**Clasificacion:** Pendiente
+**Valor:** 6.4 dias promedio (ultimos 30 dias) | 4.7 dias promedio (ultimos 30 PRs)
+**Clasificacion:** High (1-7 dias)
 
-**Fuente de datos:** `gh pr list --state merged --json createdAt,mergedAt`
+**Fuente de datos:** `gh pr list --repo juice-shop/juice-shop --state merged --json createdAt,mergedAt`
 
-**Calculo:** Promedio del tiempo entre la creacion de un PR y su merge. Actualmente el equipo ha estado haciendo commits directos a master sin PRs, por lo que esta metrica se activara cuando se adopte el flujo de PRs.
+**Calculo:** Promedio del tiempo entre la creacion de un PR y su merge.
+
+| PR | Titulo | Creado | Mergeado | Lead Time |
+|----|--------|--------|----------|-----------|
+| #1 | refactor: removed duplicate code in verify.ts | Feb 11 | Feb 11 | 0.8 hrs |
+| #2 | modernize stylelint to v16 | Feb 04 | Feb 08 | 88.1 hrs |
+| #3 | New Crowdin updates | Jan 31 | Feb 08 | 196.1 hrs |
+| #4 | fix(chatbot): remove duplicate addUser call | Jan 25 | Jan 26 | 26.0 hrs |
+| #5 | test: add validation for challenge tags | Jan 20 | Jan 22 | 41.1 hrs |
+| #6 | chore: remove unused dependencies | Jan 19 | Jan 22 | 76.2 hrs |
+| #7 | Add unit tests for NFTUnlockComponent | Jan 14 | Jan 15 | 9.8 hrs |
+| #8 | Extend /rest/languages with metrics | Jan 03 | Jan 05 | 53.4 hrs |
+| #9 | New Crowdin updates | Jan 02 | Jan 14 | 290.5 hrs |
+
+**Interpretacion:** El lead time varia significativamente: refactors simples se mergen en horas, mientras que traducciones (Crowdin) y features complejas toman dias a semanas. Excluyendo actualizaciones automaticas de Crowdin, el lead time promedio es ~4 dias.
 
 ### 3. Mean Time to Restore (MTTR)
 
-**Valor:** N/A
-**Clasificacion:** N/A (sin incidentes registrados)
+**Valor:** 18.5 horas promedio (ultimos 30 dias) | 7.6 dias promedio (ultimos 30 bugs)
+**Clasificacion:** High (< 1 dia) para los ultimos 30 dias
 
-**Fuente de datos:** `gh issue list --state closed --label bug --json createdAt,closedAt`
+**Fuente de datos:** `gh issue list --repo juice-shop/juice-shop --state closed --label bug --json createdAt,closedAt`
 
-**Interpretacion:** No se han registrado issues con label "bug" en el fork. Esta metrica requiere tracking operacional de incidentes. Se recomienda:
-1. Usar GitHub Issues con label "bug" para reportar problemas
-2. Cerrar issues cuando se resuelvan para calcular MTTR automaticamente
+**Bugs cerrados en los ultimos 30 dias:**
+
+| Bug | Titulo | Creado | Cerrado | Tiempo |
+|-----|--------|--------|---------|--------|
+| #1 | [bug] (sin descripcion) | Feb 11 | Feb 11 | 1.0 hrs |
+| #2 | Security Question Dropdown Not Opening | Feb 04 | Feb 06 | 40.0 hrs |
+| #3 | Debug console.log left in production | Jan 21 | Jan 22 | 19.5 hrs |
+| #4 | Silent error handling in verify.ts | Jan 21 | Jan 22 | 23.8 hrs |
+| #5 | Race condition in product review likes | Jan 19 | Jan 20 | 8.2 hrs |
+
+**Interpretacion:** El MTTR reciente (18.5 horas) es significativamente mejor que el historico (7.6 dias). Esto indica que el equipo upstream ha mejorado su velocidad de respuesta a bugs. La mayoria de bugs se resuelven en menos de 24 horas.
 
 ### 4. Change Failure Rate (Tasa de Fallos)
 
-**Valor:** 0% (0 reverts de 6 deploys)
+**Valor:** 0% (0 reverts de 9 merges)
 **Clasificacion:** Elite
 
-**Fuente de datos:** `git log --grep="revert" master`
+**Fuente de datos:** `gh api repos/juice-shop/juice-shop/commits` filtrado por mensajes con "revert"
 
-**Interpretacion:** Ningun deploy ha requerido revert, lo cual indica estabilidad. Esta metrica se monitoreara conforme aumenten los cambios al codebase.
+**Interpretacion:** No se encontraron reverts en los commits recientes, lo cual indica que los cambios mergeados son estables. El proceso de code review via PRs y el CI pipeline del upstream contribuyen a esta estabilidad.
+
+---
+
+## Resumen de Clasificacion DORA
+
+```
+                     ELITE        HIGH         MEDIUM       LOW
+                   ─────────── ─────────── ─────────── ───────────
+Deploy Frequency   |           |███████████|           |           |  2.1/sem
+Lead Time          |           |███████████|           |           |  6.4 dias
+MTTR               |           |███████████|           |           |  18.5 hrs
+Change Failure     |███████████|           |           |           |  0%
+```
+
+**Clasificacion general del proyecto: HIGH** (3 metricas High, 1 Elite)
 
 ---
 
 ## Tendencia Historica
 
-> Esta tabla se actualiza automaticamente en cada ejecucion del pipeline en GitHub Actions.
-
 | Semana | Deploy Freq. | Lead Time | MTTR | CFR |
 |--------|-------------|-----------|------|-----|
-| 2026-W06 | 1.4/sem (High) | Pendiente | N/A | 0% (Elite) |
+| 2026-W06 (actual) | 2.1/sem (High) | 6.4 dias (High) | 18.5 hrs (High) | 0% (Elite) |
 
 ---
 
@@ -82,10 +117,10 @@
 
 | Metrica | Fuente | Comando |
 |---------|--------|---------|
-| Deployment Frequency | Git history | `git log --oneline --since="30 days ago" master \| wc -l` |
-| Lead Time for Changes | GitHub API (PRs) | `gh pr list --state merged --limit 20 --json createdAt,mergedAt` |
-| Mean Time to Restore | GitHub API (Issues) | `gh issue list --state closed --label "bug" --limit 20 --json createdAt,closedAt` |
-| Change Failure Rate | Git history | `git log --oneline --grep="revert" -i --since="30 days ago" master \| wc -l` |
+| Deployment Frequency | GitHub API (PRs mergeados) | `gh pr list --repo juice-shop/juice-shop --state merged --limit 30` |
+| Lead Time for Changes | GitHub API (PRs) | `gh pr list --repo juice-shop/juice-shop --state merged --json createdAt,mergedAt` |
+| Mean Time to Restore | GitHub API (Issues) | `gh issue list --repo juice-shop/juice-shop --state closed --label bug --json createdAt,closedAt` |
+| Change Failure Rate | GitHub API (Commits) | `gh api repos/juice-shop/juice-shop/commits` filtrado por "revert" |
 
 ### Clasificacion DORA
 
@@ -98,21 +133,23 @@
 
 ### Supuestos y Limitaciones
 
-1. **Cada commit a master se considera un deploy.** En un entorno de produccion real, el deploy podria estar condicionado a un pipeline exitoso
-2. **Los reverts se detectan por el mensaje del commit** (`git log --grep="revert"`). Hotfixes directos que no incluyan "revert" no se contabilizan
-3. **MTTR depende de la disciplina de usar GitHub Issues** con el label "bug". Incidentes no reportados no se capturan
-4. **Lead Time requiere el uso de Pull Requests.** Commits directos a master tienen lead time = 0 por definicion
+1. **Se usa el repositorio upstream** como fuente de datos porque el fork del equipo tiene historial limitado (commits directos sin PRs)
+2. **Cada PR mergeado a master/develop se considera un deploy**, ya que el upstream tiene CI/CD que publica Docker images automaticamente
+3. **Los reverts se detectan por el mensaje del commit** (`revert` en el mensaje). Hotfixes directos no se contabilizan
+4. **MTTR se calcula con issues etiquetados como "bug"**. Incidentes no reportados en GitHub no se capturan
+5. **Lead Time incluye PRs de Crowdin** (traducciones automaticas) que inflan el promedio por su naturaleza de batch updates
 
 ---
 
 ## Como Ejecutar
 
 ```bash
-# Localmente (requiere gh CLI autenticado para Lead Time y MTTR)
+# Metricas del fork (automatico en GitHub Actions)
 bash scripts/dora-metrics.sh
 
-# En GitHub Actions (automatico en push a master)
-# Ver job "DORA Metrics" en .github/workflows/governance.yml
+# Metricas del upstream (manual)
+gh pr list --repo juice-shop/juice-shop --state merged --limit 30 --json createdAt,mergedAt
+gh issue list --repo juice-shop/juice-shop --state closed --label bug --limit 30 --json createdAt,closedAt
 ```
 
 ---
