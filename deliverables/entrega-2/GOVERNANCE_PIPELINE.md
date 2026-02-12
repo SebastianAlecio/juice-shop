@@ -93,12 +93,28 @@ graph LR
 - **Justificacion:** Juice Shop **intencionalmente** usa dependencias vulnerables como parte de su diseño para entrenamiento en seguridad (`express-jwt 0.1.3`, `sanitize-html 1.4.2`, `jsonwebtoken 0.4.0`). Fallar en npm audit bloquearia permanentemente el CI. El reporte se captura como artefacto
 
 ### Stage 5b: SonarCloud Analysis
-- **Herramienta:** SonarCloud (sonarcloud.io) via `SonarSource/sonarcloud-action@v5`
+- **Herramienta:** SonarCloud (sonarcloud.io) via `SonarSource/sonarcloud-github-action@v5`
 - **Quality Gate:** Bugs, Code Smells, Duplicaciones, Coverage en codigo nuevo
 - **Umbral:** Bugs = 0, Code Smells <= 10, Coverage >= 15%, Duplicacion <= 5% (en codigo nuevo)
 - **Si falla:** Warning (informativo en primera fase)
 - **Justificacion:** Complementa el analisis de ESLint con metricas de duplicacion, cognitive complexity, y quality gates multi-dimensionales. Se configura como warning inicialmente porque las reglas de seguridad de SonarCloud flaggearian las vulnerabilidades intencionales de Juice Shop. La coverage se alimenta de los reportes LCOV generados en Stages 3 y 4.
 - **Prerequisitos:** Configurar `SONAR_TOKEN` en GitHub Secrets y crear proyecto en sonarcloud.io
+- **Dashboard:** [sonarcloud.io/dashboard?id=SebastianAlecio_juice-shop](https://sonarcloud.io/dashboard?id=SebastianAlecio_juice-shop)
+
+**Resultados de SonarCloud (primera ejecucion):**
+
+| Metrica | Valor | Interpretacion |
+|---------|-------|----------------|
+| Bugs | 0 | Sin bugs detectados |
+| Vulnerabilities | 33 | Esperado — vulnerabilidades intencionales del proyecto |
+| Code Smells | 256 | Oportunidades de mejora en mantenibilidad |
+| Coverage | 75.7% | Combinada (server + API tests) |
+| Duplicated Lines | 0.7% | Excelente — muy baja duplicacion |
+| Cognitive Complexity | 1,233 | Total acumulado del codebase |
+| Lines of Code | 8,397 | Backend analizado |
+| Reliability Rating | A | Sin bugs |
+| Maintainability Rating | A | Deuda tecnica manejable |
+| Security Rating | E | Esperado — Juice Shop es intencionalmente vulnerable |
 
 ### Stage 6: Deploy Staging
 - **Herramienta:** Docker build + docker run
@@ -260,6 +276,38 @@ Estos umbrales "baseline - margen" aseguran que el pipeline detecta degradacion 
 
 **Tiempo total del pipeline:** ~15 minutos
 **Artefactos generados:** complexity-report, security-audit, unit-test-coverage, api-test-coverage, dora-metrics-3
+
+### Cuarta Ejecucion (Run #4 — FAIL → PASS)
+
+**URL:** [Run #21932735356](https://github.com/SebastianAlecio/juice-shop/actions/runs/21932735356) (FAIL) → [Run #21932960341](https://github.com/SebastianAlecio/juice-shop/actions/runs/21932960341) (PASS)
+
+**Cambios introducidos:** SonarCloud (Stage 5b), Tech Debt Audit, Plan de Refactorizacion
+
+**Run #4a — FAIL:**
+- SonarCloud fallaba por nombre incorrecto del action (`sonarcloud-action` → `sonarcloud-github-action`)
+- Fix aplicado en el workflow
+
+**Run #4b — FAIL:**
+- SonarCloud fallaba porque "Automatic Analysis" estaba habilitado en sonarcloud.io y conflictua con CI analysis
+- Fix: desactivar Automatic Analysis en SonarCloud Administration → Analysis Method
+
+**Run #4c — PASS:** Todos los 10 jobs pasaron exitosamente
+
+| Job | Tiempo | Status |
+|-----|--------|--------|
+| DORA Metrics | 12s | PASS |
+| Stage 1 - Commit & Build | 3m 20s | PASS |
+| Stage 2 - Static Analysis | 2m 3s | PASS (2 warnings de complejidad) |
+| Stage 3 - Unit Tests | 4m 15s | PASS |
+| Stage 4 - Integration Tests | 3m 52s | PASS |
+| Stage 5 - Security Scan | 1m 10s | PASS (auditoria capturada) |
+| **Stage 5b - SonarCloud** | **1m 19s** | **PASS** (164 archivos analizados) |
+| Stage 6 - Deploy Staging | 4m 15s | PASS (Docker build + health check) |
+| Stage 7 - Smoke Tests | 41s | PASS |
+| Quality Summary | 2s | PASS |
+
+**Tiempo total del pipeline:** ~6m 32s
+**SonarCloud Dashboard:** [sonarcloud.io/dashboard?id=SebastianAlecio_juice-shop](https://sonarcloud.io/dashboard?id=SebastianAlecio_juice-shop)
 
 ---
 

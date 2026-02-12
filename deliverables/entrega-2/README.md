@@ -55,6 +55,12 @@ Integracion de SonarCloud en el pipeline de gobernanza:
 - Stage 5b en el workflow que consume reportes de coverage de Stages 3 y 4
 - Quality gates: bugs, code smells, duplicacion, coverage en codigo nuevo
 
+Resultados de la primera ejecucion:
+- **Bugs:** 0 | **Vulnerabilities:** 33 (intencionales) | **Code Smells:** 256
+- **Coverage:** 75.7% | **Duplicated Lines:** 0.7%
+- **Reliability:** A | **Maintainability:** A | **Security:** E (esperado)
+- **Dashboard:** [sonarcloud.io](https://sonarcloud.io/dashboard?id=SebastianAlecio_juice-shop)
+
 **Implementacion:** [`sonar-project.properties`](../../sonar-project.properties) + Stage 5b en [`.github/workflows/governance.yml`](../../.github/workflows/governance.yml)
 
 ### 4. Tech Debt Audit
@@ -91,7 +97,7 @@ Incluye metricas antes/despues, cronograma, evaluacion de riesgo por candidato.
 
 | Criterio | Estado | Evidencia |
 |----------|--------|-----------|
-| CI Pipeline runs successfully on PRs | Implementado | `.github/workflows/governance.yml` — 8+ stages automatizados |
+| CI Pipeline runs successfully on PRs | Implementado | `.github/workflows/governance.yml` — 10 jobs (8 stages + SonarCloud + DORA) |
 | Dashboard with four DORA metrics | Implementado | `DORA_DASHBOARD.md` + `scripts/dora-metrics.sh` |
 | Define Quality gates + configure SonarQube | Implementado | `sonar-project.properties` + Stage 5b en `governance.yml` + quality gates documentados |
 | Refactoring plan is specific and prioritized | Implementado | `REFACTORING_PLAN.md` — 3 candidatos con Strangler Fig, metricas de exito, cronograma |
