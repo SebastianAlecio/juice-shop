@@ -354,8 +354,8 @@ Estos umbrales "baseline - margen" aseguran que el pipeline detecta degradacion 
 | [`.eslintrc.js`](../../.eslintrc.js) | Modificado | Regla `complexity` con umbral 15 |
 | [`scripts/complexity-report.js`](../../scripts/complexity-report.js) | Creado | Generador de reporte de complejidad ciclomatica |
 | [`scripts/dora-metrics.sh`](../../scripts/dora-metrics.sh) | Creado | Calculador de metricas DORA |
-| [`deliverables/entrega-2/DORA_DASHBOARD.md`](DORA_DASHBOARD.md) | Creado | Dashboard de metricas DORA |
+| [`deliverables/Entrega 2/DORA_DASHBOARD.md`](DORA_DASHBOARD.md) | Creado | Dashboard de metricas DORA |
 | [`sonar-project.properties`](../../sonar-project.properties) | Creado | Configuracion de SonarCloud |
 | [`scripts/hotspot-analysis.js`](../../scripts/hotspot-analysis.js) | Creado | Analisis de hotspots (churn x complejidad) |
-| [`deliverables/entrega-2/TECH_DEBT_AUDIT.md`](TECH_DEBT_AUDIT.md) | Creado | Auditoria de deuda tecnica |
-| [`deliverables/entrega-2/REFACTORING_PLAN.md`](REFACTORING_PLAN.md) | Creado | Plan de refactorizacion Strangler Fig |
+| [`deliverables/Entrega 2/TECH_DEBT_AUDIT.md`](TECH_DEBT_AUDIT.md) | Creado | Auditoria de deuda tecnica |
+| [`deliverables/Entrega 2/REFACTORING_PLAN.md`](REFACTORING_PLAN.md) | Creado | Plan de refactorizacion Strangler Fig |

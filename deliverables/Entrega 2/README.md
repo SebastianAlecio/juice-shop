@@ -114,11 +114,11 @@ Incluye metricas antes/despues, cronograma, evaluacion de riesgo por candidato.
 | `scripts/complexity-report.js` | Creado | Reporte de complejidad ciclomatica |
 | `scripts/dora-metrics.sh` | Creado | Calculador de metricas DORA |
 | `scripts/hotspot-analysis.js` | Creado | Analisis de hotspots (churn x complejidad) |
-| `deliverables/entrega-2/GOVERNANCE_PIPELINE.md` | Creado | Documentacion del pipeline |
-| `deliverables/entrega-2/DORA_DASHBOARD.md` | Creado | Dashboard de metricas DORA |
-| `deliverables/entrega-2/TECH_DEBT_AUDIT.md` | Creado | Auditoria de deuda tecnica |
-| `deliverables/entrega-2/REFACTORING_PLAN.md` | Creado | Plan de refactorizacion Strangler Fig |
-| `deliverables/entrega-2/README.md` | Creado | Este archivo |
+| `deliverables/Entrega 2/GOVERNANCE_PIPELINE.md` | Creado | Documentacion del pipeline |
+| `deliverables/Entrega 2/DORA_DASHBOARD.md` | Creado | Dashboard de metricas DORA |
+| `deliverables/Entrega 2/TECH_DEBT_AUDIT.md` | Creado | Auditoria de deuda tecnica |
+| `deliverables/Entrega 2/REFACTORING_PLAN.md` | Creado | Plan de refactorizacion Strangler Fig |
+| `deliverables/Entrega 2/README.md` | Creado | Este archivo |
 
 ---
 
