@@ -135,9 +135,10 @@ graph LR
 - **Quality Gate:** N/A
 - **Umbral:** N/A
 - **Si falla:** N/A
-- **Justificacion:** Fuera del alcance del proyecto universitario. En produccion, se pusharia la imagen Docker a un registry y se desplegaria a la infraestructura destino
+- **Justificacion:** Fuera del alcance del proyecto. En produccion, se pusharia la imagen Docker a un registry y se desplegaria a la infraestructura destino
 
 ---
+
 
 ## 4. Quality Gates Summary
 
@@ -308,6 +309,14 @@ Estos umbrales "baseline - margen" aseguran que el pipeline detecta degradacion 
 
 **Tiempo total del pipeline:** ~6m 32s
 **SonarCloud Dashboard:** [sonarcloud.io/dashboard?id=SebastianAlecio_juice-shop](https://sonarcloud.io/dashboard?id=SebastianAlecio_juice-shop)
+
+---
+
+### Evidencia: Pipeline en GitHub Actions (Run #4 — PASS)
+
+![Pipeline de Gobernanza — 10 jobs, todos en verde (~6m 32s)](image.png)
+
+*Captura de `governance.yml` en GitHub Actions. Los 10 jobs pasan exitosamente: Build → Stages 2-5 en paralelo → SonarCloud → Deploy Staging → Smoke Tests → Quality Summary. DORA Metrics corre como job independiente.*
 
 ---
 
