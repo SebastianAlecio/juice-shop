@@ -337,16 +337,7 @@ Estos umbrales "baseline - margen" aseguran que el pipeline detecta degradacion 
 
 ---
 
-## 8. Trabajo Futuro
-
-- **SonarCloud Quality Gate Enforcement:** Cambiar SonarCloud de warning a blocking una vez calibrados los umbrales
-- **Ejecutar Refactorizacion:** Implementar las fases del [Plan de Refactorizacion](REFACTORING_PLAN.md) para los 3 candidatos
-- **DORA Historical Tracking:** Acumulacion de metricas historicas conforme el equipo trabaja
-- **Mutation Testing:** Agregar mutation testing para funciones criticas de seguridad en `lib/insecurity.ts`
-
----
-
-## 9. Archivos Creados/Modificados
+## 8. Archivos Creados/Modificados
 
 | Archivo | Accion | Proposito |
 |---------|--------|-----------|
