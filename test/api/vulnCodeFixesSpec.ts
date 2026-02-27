@@ -5,7 +5,7 @@
 
 import { expect } from '@jest/globals'
 import * as frisby from 'frisby'
-import io from 'socket.io-client'
+import { io } from 'socket.io-client'
 import { Joi } from 'frisby'
 
 const URL = 'http://localhost:3000'
@@ -30,7 +30,7 @@ describe('/snippets/fixes/:key', () => {
 })
 
 describe('/snippets/fixes', () => {
-  let socket: SocketIOClient.Socket
+  let socket: ReturnType<typeof io>
 
   beforeEach(done => {
     socket = io('http://localhost:3000', {
