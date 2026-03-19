@@ -50,64 +50,60 @@ export function dataExport () {
         memories: []
       }
 
-      const memories = await MemoryModel.findAll({ where: { UserId: req.body.UserId } })
-      memories.forEach((memory: MemoryModel) => {
-        userData.memories.push({
-          imageUrl: req.protocol + '://' + req.get('host') + '/' + memory.imagePath,
-          caption: memory.caption
-        })
-      })
+      try {
+        const [memories, orders, reviews] = await Promise.all([
+          MemoryModel.findAll({ where: { UserId: req.body.UserId } }),
+          db.ordersCollection.find({ email: updatedEmail }) as Promise<Array<{
+            orderId: string
+            totalPrice: number
+            products: ProductModel[]
+            bonus: number
+            eta: string
+          }>>,
+          db.reviewsCollection.find({ author: email }) as Promise<Array<{
+            message: string
+            author: string
+            product: number
+            likesCount: number
+            likedBy: string
+          }>>
+        ])
 
-      db.ordersCollection.find({ email: updatedEmail }).then((orders: Array<{
-        orderId: string
-        totalPrice: number
-        products: ProductModel[]
-        bonus: number
-        eta: string
-      }>) => {
-        if (orders.length > 0) {
-          orders.forEach(order => {
-            userData.orders.push({
-              orderId: order.orderId,
-              totalPrice: order.totalPrice,
-              products: [...order.products],
-              bonus: order.bonus,
-              eta: order.eta
-            })
+        memories.forEach((memory: MemoryModel) => {
+          userData.memories.push({
+            imageUrl: req.protocol + '://' + req.get('host') + '/' + memory.imagePath,
+            caption: memory.caption
           })
-        }
-
-        db.reviewsCollection.find({ author: email }).then((reviews: Array<{
-          message: string
-          author: string
-          product: number
-          likesCount: number
-          likedBy: string
-        }>) => {
-          if (reviews.length > 0) {
-            reviews.forEach(review => {
-              userData.reviews.push({
-                message: review.message,
-                author: review.author,
-                productId: review.product,
-                likesCount: review.likesCount,
-                likedBy: review.likedBy
-              })
-            })
-          }
-          const emailHash = security.hash(email).slice(0, 4)
-          for (const order of userData.orders) {
-            challengeUtils.solveIf(challenges.dataExportChallenge, () => { return order.orderId.split('-')[0] !== emailHash })
-          }
-          res.status(200).send({ userData: JSON.stringify(userData, null, 2), confirmation: 'Your data export will open in a new Browser window.' })
-        },
-        () => {
-          next(new Error(`Error retrieving reviews for ${updatedEmail}`))
         })
-      },
-      () => {
-        next(new Error(`Error retrieving orders for ${updatedEmail}`))
-      })
+
+        orders.forEach(order => {
+          userData.orders.push({
+            orderId: order.orderId,
+            totalPrice: order.totalPrice,
+            products: [...order.products],
+            bonus: order.bonus,
+            eta: order.eta
+          })
+        })
+
+        reviews.forEach(review => {
+          userData.reviews.push({
+            message: review.message,
+            author: review.author,
+            productId: review.product,
+            likesCount: review.likesCount,
+            likedBy: review.likedBy
+          })
+        })
+
+        const emailHash = security.hash(email).slice(0, 4)
+        for (const order of userData.orders) {
+          challengeUtils.solveIf(challenges.dataExportChallenge, () => { return order.orderId.split('-')[0] !== emailHash })
+        }
+        res.status(200).send({ userData: JSON.stringify(userData, null, 2), confirmation: 'Your data export will open in a new Browser window.' })
+      } catch {
+        next(new Error(`Error retrieving data for ${updatedEmail}`))
+      }
     } else {
       next(new Error('Blocked illegal activity by ' + req.socket.remoteAddress))
     }

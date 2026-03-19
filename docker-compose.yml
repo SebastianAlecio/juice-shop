@@ -1,0 +1,25 @@
+# OWASP Juice Shop — One-Command Setup
+# Usage: docker compose up
+# Access: http://localhost:3000
+
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:v19.1.1
+    container_name: juice-shop
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - juice-shop-logs:/juice-shop/logs
+    healthcheck:
+      test: ["CMD", "/nodejs/bin/node", "-e", "const http=require('http');const r=http.get('http://localhost:3000/api/Challenges',(s)=>{process.exit(s.statusCode===200?0:1)});r.on('error',()=>process.exit(1));r.setTimeout(3000,()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+volumes:
+  juice-shop-logs:
+    driver: local

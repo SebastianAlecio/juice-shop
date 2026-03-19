@@ -141,31 +141,31 @@ export const databaseRelatedChallenges = () => (req: Request, res: Response, nex
     feedbackChallenge()
   }
   if (challengeUtils.notSolved(challenges.knownVulnerableComponentChallenge)) {
-    knownVulnerableComponentChallenge()
+    solveIfMentionedIn(challenges.knownVulnerableComponentChallenge, { [Op.or]: knownVulnerableComponents() })
   }
   if (challengeUtils.notSolved(challenges.weirdCryptoChallenge)) {
-    weirdCryptoChallenge()
+    solveIfMentionedIn(challenges.weirdCryptoChallenge, { [Op.or]: weirdCryptos() })
   }
   if (challengeUtils.notSolved(challenges.typosquattingNpmChallenge)) {
-    typosquattingNpmChallenge()
+    solveIfMentionedIn(challenges.typosquattingNpmChallenge, { [Op.like]: '%epilogue-js%' })
   }
   if (challengeUtils.notSolved(challenges.typosquattingAngularChallenge)) {
-    typosquattingAngularChallenge()
+    solveIfMentionedIn(challenges.typosquattingAngularChallenge, { [Op.like]: '%ngy-cookie%' })
   }
   if (challengeUtils.notSolved(challenges.hiddenImageChallenge)) {
-    hiddenImageChallenge()
+    solveIfMentionedIn(challenges.hiddenImageChallenge, { [Op.like]: '%pickle rick%' })
   }
   if (challengeUtils.notSolved(challenges.supplyChainAttackChallenge)) {
-    supplyChainAttackChallenge()
+    solveIfMentionedIn(challenges.supplyChainAttackChallenge, { [Op.or]: eslintScopeVulnIds() })
   }
   if (challengeUtils.notSolved(challenges.dlpPastebinDataLeakChallenge)) {
-    dlpPastebinDataLeakChallenge()
+    solveIfMentionedIn(challenges.dlpPastebinDataLeakChallenge, { [Op.and]: dangerousIngredients() })
   }
   if (challengeUtils.notSolved(challenges.csafChallenge)) {
-    csafChallenge()
+    solveIfMentionedIn(challenges.csafChallenge, { [Op.like]: '%' + config.get<string>('challenges.csafHashValue') + '%' })
   }
   if (challengeUtils.notSolved(challenges.leakedApiKeyChallenge)) {
-    leakedApiKeyChallenge()
+    solveIfMentionedIn(challenges.leakedApiKeyChallenge, { [Op.like]: '%6PPi37DBxP4lDwlriuaxP15HaDJpsUXY5TspVmie%' })
   }
   next()
 }
@@ -199,29 +199,13 @@ function feedbackChallenge () {
   })
 }
 
-function knownVulnerableComponentChallenge () {
-  FeedbackModel.findAndCountAll({
-    where: {
-      comment: {
-        [Op.or]: knownVulnerableComponents()
-      }
-    }
-  }).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.knownVulnerableComponentChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({
-    where: {
-      message: {
-        [Op.or]: knownVulnerableComponents()
-      }
-    }
-  }).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.knownVulnerableComponentChallenge)
+function solveIfMentionedIn (challenge: Challenge, condition: any): void {
+  void Promise.all([
+    FeedbackModel.findAndCountAll({ where: { comment: condition } }),
+    ComplaintModel.findAndCountAll({ where: { message: condition } })
+  ]).then(([{ count: feedbackCount }, { count: complaintCount }]) => {
+    if (feedbackCount > 0 || complaintCount > 0) {
+      challengeUtils.solve(challenge)
     }
   }).catch(() => {
     throw new Error('Unable to get data for known vulnerabilities. Please try again')
@@ -245,35 +229,6 @@ function knownVulnerableComponents () {
   ]
 }
 
-function weirdCryptoChallenge () {
-  FeedbackModel.findAndCountAll({
-    where: {
-      comment: {
-        [Op.or]: weirdCryptos()
-      }
-    }
-  }).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.weirdCryptoChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({
-    where: {
-      message: {
-        [Op.or]: weirdCryptos()
-      }
-    }
-  }).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.weirdCryptoChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-}
-
 function weirdCryptos () {
   return [
     { [Op.like]: '%z85%' },
@@ -284,150 +239,11 @@ function weirdCryptos () {
   ]
 }
 
-function typosquattingNpmChallenge () {
-  FeedbackModel.findAndCountAll({ where: { comment: { [Op.like]: '%epilogue-js%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.typosquattingNpmChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({ where: { message: { [Op.like]: '%epilogue-js%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.typosquattingNpmChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-}
-
-function typosquattingAngularChallenge () {
-  FeedbackModel.findAndCountAll({ where: { comment: { [Op.like]: '%ngy-cookie%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.typosquattingAngularChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({ where: { message: { [Op.like]: '%ngy-cookie%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.typosquattingAngularChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-}
-
-function hiddenImageChallenge () {
-  FeedbackModel.findAndCountAll({ where: { comment: { [Op.like]: '%pickle rick%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.hiddenImageChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({ where: { message: { [Op.like]: '%pickle rick%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.hiddenImageChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-}
-
-function supplyChainAttackChallenge () {
-  FeedbackModel.findAndCountAll({ where: { comment: { [Op.or]: eslintScopeVulnIds() } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.supplyChainAttackChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({ where: { message: { [Op.or]: eslintScopeVulnIds() } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.supplyChainAttackChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-}
-
 function eslintScopeVulnIds () {
   return [
     { [Op.like]: '%eslint-scope/issues/39%' },
     { [Op.like]: '%npm:eslint-scope:20180712%' }
   ]
-}
-
-function dlpPastebinDataLeakChallenge () {
-  FeedbackModel.findAndCountAll({
-    where: {
-      comment: { [Op.and]: dangerousIngredients() }
-    }
-  }).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.dlpPastebinDataLeakChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({
-    where: {
-      message: { [Op.and]: dangerousIngredients() }
-    }
-  }).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.dlpPastebinDataLeakChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-}
-
-function csafChallenge () {
-  FeedbackModel.findAndCountAll({ where: { comment: { [Op.like]: '%' + config.get<string>('challenges.csafHashValue') + '%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.csafChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({ where: { message: { [Op.like]: '%' + config.get<string>('challenges.csafHashValue') + '%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.csafChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-}
-
-function leakedApiKeyChallenge () {
-  FeedbackModel.findAndCountAll({ where: { comment: { [Op.like]: '%6PPi37DBxP4lDwlriuaxP15HaDJpsUXY5TspVmie%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.leakedApiKeyChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
-  ComplaintModel.findAndCountAll({ where: { message: { [Op.like]: '%6PPi37DBxP4lDwlriuaxP15HaDJpsUXY5TspVmie%' } } }
-  ).then(({ count }: { count: number }) => {
-    if (count > 0) {
-      challengeUtils.solve(challenges.leakedApiKeyChallenge)
-    }
-  }).catch(() => {
-    throw new Error('Unable to get data for known vulnerabilities. Please try again')
-  })
 }
 
 function dangerousIngredients () {
